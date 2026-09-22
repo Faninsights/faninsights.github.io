@@ -1,0 +1,3738 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTCI ASI — 專案戰情室 [Arial版]</title>
+<script src="chart.umd.min.js"></script>
+<style>
+:root {
+  --bg0:      #080b12;
+  --bg1:      #0d1117;
+  --bg2:      #111820;
+  --bg3:      #162030;
+  --orange:   #FF5722;
+  --orange-g: #FF8A50;
+  --cyan:     #00E5FF;
+  --cyan-d:   #00B8CC;
+  --blue:     #1E90FF;
+  --amber:    #FFB300;
+  --red:      #FF3D3D;
+  --green:    #00E676;
+  --purple:   #CE93D8;
+  --text:     #E0E8F0;
+  --muted:    #8BAAC8;
+  --border:   rgba(0,229,255,.12);
+  --border-o: rgba(255,87,34,.2);
+  --glow-c:   0 0 12px rgba(0,229,255,.35);
+  --glow-o:   0 0 12px rgba(255,87,34,.45);
+  --glow-g:   0 0 10px rgba(0,230,118,.35);
+  --glow-r:   0 0 12px rgba(255,61,61,.4);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg0);
+  color:var(--text);
+  font-family:'Arial','PingFang TC','Microsoft JhengHei',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── SCANLINE OVERLAY ─────────────────────────── */
+body::before{
+  content:'';pointer-events:none;
+  position:fixed;inset:0;z-index:9999;
+  background:repeating-linear-gradient(
+    0deg,transparent,transparent 2px,
+    rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px
+  );
+}
+
+/* ── GRID BG ──────────────────────────────────── */
+body::after{
+  content:'';pointer-events:none;
+  position:fixed;inset:0;z-index:0;
+  background-image:
+    linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+
+/* ── SWEEP ANIMATION ──────────────────────────── */
+@keyframes sweep{0%{transform:translateX(-100%);}100%{transform:translateX(100vw);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+@keyframes blink{0%,100%{opacity:1;}49%{opacity:1;}50%{opacity:0;}99%{opacity:0;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes scanH{0%{top:-2px;}100%{top:100%;}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 6px rgba(0,229,255,.3);}50%{box-shadow:0 0 18px rgba(0,229,255,.7);}}
+
+.sweep-line{
+  position:fixed;top:0;left:0;width:3px;height:100vh;
+  background:linear-gradient(to bottom,transparent,var(--cyan),transparent);
+  opacity:.15;z-index:1;pointer-events:none;
+  animation:sweep 8s linear infinite;
+}
+
+/* ── TOPBAR ───────────────────────────────────── */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  height:76px;
+  background:rgba(8,11,18,.92);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;
+}
+.topbar::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),var(--orange),transparent);
+  opacity:.5;
+}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-hex{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,var(--orange),var(--amber));
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;
+  animation:glowPulse 3s ease-in-out infinite;
+}
+.logo-name{font-size:18px;font-weight:700;color:var(--cyan);letter-spacing:2px;text-transform:uppercase;}
+.logo-sub{font-size:14px;color:#A8C4D8;letter-spacing:3px;text-transform:uppercase;margin-top:1px;}
+.topbar-center{display:flex;align-items:center;gap:6px;font-size:15px;color:#A8C4D8;letter-spacing:2px;}
+.topbar-center .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.sys-tag{
+  font-size:15px;letter-spacing:1px;color:#00FFFF;
+  border:1px solid rgba(0,229,255,.4);padding:4px 12px;border-radius:2px;
+  background:rgba(0,229,255,.08);
+}
+.back-btn{
+  display:none;font-size:14px;letter-spacing:1px;
+  background:rgba(255,87,34,.1);border:1px solid var(--orange-g);
+  color:var(--orange-g);padding:5px 14px;border-radius:2px;cursor:pointer;
+  text-transform:uppercase;
+}
+.back-btn.show{display:block;}
+
+/* ── GENIE FAB ────────────────────────────────── */
+.genie-fab{
+  display:flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#FF3621,#FF8C00);
+  color:#fff;border:none;cursor:pointer;
+  padding:7px 14px 7px 10px;border-radius:3px;
+  font-size:15px;font-weight:700;letter-spacing:1px;font-family:'Arial',sans-serif;
+  box-shadow:0 0 16px rgba(255,54,33,.5);
+  transition:box-shadow .2s;text-transform:uppercase;
+  white-space:nowrap;flex-shrink:0;
+}
+.genie-fab:hover{box-shadow:0 0 28px rgba(255,54,33,.8);}
+.genie-fab-icon{font-size:18px;}
+
+/* ── SUMMARY STRIP ────────────────────────────── */
+.summary-strip{
+  display:grid;grid-template-columns:repeat(6,1fr);
+  border-bottom:1px solid var(--border);
+  position:relative;z-index:1;
+}
+.sum-card{
+  padding:20px 28px;border-right:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.sum-card:last-child{border-right:none;}
+.sum-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+}
+.sum-card::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(0,229,255,.03),transparent);
+  pointer-events:none;
+}
+.sum-label{font-size:14px;color:#A8C4D8;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+.sum-value{font-size:42px;font-weight:700;line-height:1;font-family:'Arial',sans-serif;}
+.sum-value.c{color:var(--cyan);}
+.sum-value.o{color:var(--orange);}
+.sum-value.g{color:var(--green);}
+.sum-value.a{color:var(--amber);}
+.sum-value.r{color:var(--red);}
+.sum-sub{font-size:14px;color:#A8C4D8;margin-top:5px;letter-spacing:1px;}
+
+/* ── SECTION HEADER ───────────────────────────── */
+.section-hd{
+  padding:8px 24px;
+  background:rgba(0,229,255,.04);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.section-hd h2{
+  font-size:18px;font-weight:700;color:#00FFFF;
+  letter-spacing:2px;text-transform:uppercase;
+  display:flex;align-items:center;gap:8px;
+}
+.section-hd h2::before{content:'▶';font-size:8px;}
+.section-hd span{font-size:14px;color:#A8C4D8;letter-spacing:2px;}
+
+/* ── FILTER BAR ───────────────────────────────── */
+.filter-bar{
+  padding:8px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  background:rgba(13,17,23,.8);
+}
+.filter-bar label{font-size:14px;color:#A8C4D8;letter-spacing:2px;text-transform:uppercase;}
+.filter-btn{
+  padding:7px 18px;border-radius:2px;font-size:15px;
+  cursor:pointer;border:1px solid rgba(0,229,255,.2);
+  background:transparent;color:#8BAAC8;
+  font-family:'Arial',sans-serif;letter-spacing:1px;text-transform:uppercase;
+  transition:all .15s;
+}
+.filter-btn.active-all{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08);box-shadow:var(--glow-c);}
+.filter-btn.active-R{border-color:var(--red);color:var(--red);background:rgba(255,61,61,.08);box-shadow:var(--glow-r);}
+.filter-btn.active-A{border-color:var(--amber);color:var(--amber);background:rgba(255,179,0,.08);}
+.filter-btn.active-G{border-color:var(--green);color:var(--green);background:rgba(0,230,118,.08);box-shadow:var(--glow-g);}
+.search-box{
+  margin-left:auto;padding:6px 14px;
+  border:1px solid var(--border);border-radius:2px;
+  font-size:15px;color:#E8F4FF;background:rgba(0,229,255,.06);
+  font-family:'Arial','PingFang TC',sans-serif;outline:none;width:240px;letter-spacing:1px;
+}
+.search-box:focus{border-color:var(--cyan);box-shadow:var(--glow-c);}
+.search-box::placeholder{color:var(--muted);}
+
+/* ── TABLE ────────────────────────────────────── */
+.table-wrap{padding:12px 24px 24px;overflow-x:auto;position:relative;z-index:1;}
+table{width:100%;border-collapse:collapse;background:rgba(13,17,23,.6);}
+thead th{
+  font-size:14px;color:#00FFFF;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;
+  background:rgba(0,229,255,.07);
+  padding:14px 16px;border-bottom:1px solid rgba(0,229,255,.2);
+  text-align:left;white-space:nowrap;cursor:pointer;user-select:none;
+}
+thead th:hover{color:#fff;}
+thead th.sorted{color:var(--orange);}
+tbody tr{
+  border-bottom:1px solid rgba(0,229,255,.06);
+  cursor:pointer;transition:background .1s;
+}
+tbody tr:hover{background:rgba(0,229,255,.06);}
+tbody tr:hover td:first-child{border-left:2px solid var(--cyan);}
+tbody td{padding:15px 16px;vertical-align:middle;font-size:16px;}
+
+/* RAG */
+.rag{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 15px;border-radius:2px;font-size:15px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;font-family:'Arial',sans-serif;
+}
+.rag.R{background:rgba(255,61,61,.1);color:var(--red);border:1px solid rgba(255,61,61,.3);box-shadow:var(--glow-r);}
+.rag.A{background:rgba(255,179,0,.1);color:var(--amber);border:1px solid rgba(255,179,0,.3);}
+.rag.G{background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.3);box-shadow:var(--glow-g);}
+.rag-dot{width:6px;height:6px;border-radius:50%;}
+.rag.R .rag-dot{background:var(--red);animation:pulse 1.2s infinite;}
+.rag.A .rag-dot{background:var(--amber);animation:pulse 2s infinite;}
+.rag.G .rag-dot{background:var(--green);}
+
+/* Mini bar */
+.mini-bar-wrap{display:flex;align-items:center;gap:6px;}
+.mini-bar-bg{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:1px;}
+.mini-bar-fill{height:100%;border-radius:1px;}
+.mini-val{font-size:16px;font-weight:700;min-width:38px;text-align:right;font-family:'Arial',sans-serif;}
+
+/* Delta */
+.delta{font-size:13px;font-weight:700;padding:1px 6px;border-radius:2px;letter-spacing:.5px;font-family:'Arial',sans-serif;}
+.delta.neg{background:rgba(255,61,61,.12);color:var(--red);}
+.delta.pos{background:rgba(0,230,118,.12);color:var(--green);}
+.delta.warn{background:rgba(255,179,0,.12);color:var(--amber);}
+
+/* ── DETAIL VIEW ──────────────────────────────── */
+#view-portfolio{display:block;position:relative;z-index:1;}
+#view-detail{display:none;position:relative;z-index:1;}
+#view-portfolio.hidden{display:none !important;}
+#view-detail.hidden{display:none !important;}
+
+
+/* ── PROJECT THUMBNAIL ───────────────────────── */
+.proj-thumb{
+  width:64px;height:42px;border-radius:3px;object-fit:cover;
+  border:1px solid rgba(0,229,255,.25);
+  opacity:.85;transition:opacity .2s;flex-shrink:0;
+}
+.proj-thumb:hover{opacity:1;}
+.proj-name-cell{display:flex;align-items:center;gap:10px;}
+.proj-thumb-placeholder{
+  width:64px;height:42px;border-radius:3px;
+  background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+}
+
+/* Detail hero 大圖 */
+.detail-hero-img{
+  position:absolute;right:0;top:0;width:50%;height:100%;
+  object-fit:cover;opacity:.75;
+  mask-image:linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,.9) 30%, rgba(0,0,0,.3) 70%, transparent 100%);
+  -webkit-mask-image:linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,.9) 30%, rgba(0,0,0,.3) 70%, transparent 100%);
+  z-index:0;display:none;
+}
+
+/* ── PORTFOLIO OVERVIEW CHARTS ────────────────── */
+.portfolio-charts{
+  display:grid;grid-template-columns:1.4fr 1.3fr 1.3fr;
+  gap:12px;padding:14px 24px;
+  border-bottom:1px solid var(--border);
+  background:rgba(8,11,18,.6);
+  position:relative;z-index:1;
+}
+.pchart-card{
+  background:rgba(13,17,23,.85);
+  border:1px solid var(--border);
+  border-radius:4px;padding:14px 16px;
+  position:relative;overflow:hidden;
+}
+.pchart-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.5;
+}
+.pchart-title{font-size:13px;font-weight:700;color:#00FFFF;letter-spacing:1px;margin-bottom:2px;}
+.pchart-sub{font-size:11px;color:#8BAAC8;margin-bottom:10px;letter-spacing:.5px;}
+
+/* ── VIEW TOGGLE ──────────────────────────────── */
+.view-toggle{display:flex;align-items:center;gap:4px;
+  background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:4px;padding:3px;}
+.view-toggle-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 14px;border-radius:3px;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;background:transparent;
+  color:#8BAAC8;font-family:'Arial',sans-serif;letter-spacing:.5px;
+  transition:all .15s;
+}
+.view-toggle-btn.active{background:rgba(0,229,255,.15);color:#00FFFF;box-shadow:var(--glow-c);}
+.view-toggle-btn:hover:not(.active){color:var(--text);}
+
+
+/* ── COLLAPSIBLE SECTIONS ─────────────────────── */
+.collapse-btn{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:700;cursor:pointer;
+  border:1px solid rgba(0,229,255,.2);background:rgba(0,229,255,.06);
+  color:#00FFFF;padding:2px 10px;border-radius:3px;
+  font-family:'Arial',sans-serif;letter-spacing:.5px;
+  transition:all .15s;flex-shrink:0;
+}
+.collapse-btn:hover{background:rgba(0,229,255,.14);}
+.collapse-btn.collapsed{background:rgba(0,229,255,.03);color:#8BAAC8;border-color:rgba(0,229,255,.1);}
+.section-label{cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;}
+.section-label:hover{color:#fff;}
+
+/* ── TILE GRID ────────────────────────────────── */
+.tile-wrap{padding:16px 24px 32px;position:relative;z-index:1;display:none;}
+.tile-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.proj-tile{
+  background:rgba(13,17,23,.85);
+  border:1px solid var(--border);
+  border-radius:4px;cursor:pointer;overflow:hidden;
+  transition:border-color .15s,transform .15s;
+  position:relative;
+}
+.proj-tile:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,229,255,.15);}
+.proj-tile.rag-R{border-left:3px solid var(--red);}
+.proj-tile.rag-A{border-left:3px solid var(--amber);}
+.proj-tile.rag-G{border-left:3px solid var(--green);}
+
+/* 照片區 */
+.tile-photo{width:100%;height:140px;object-fit:cover;opacity:.7;display:block;}
+.tile-photo-placeholder{
+  width:100%;height:140px;
+  background:linear-gradient(135deg,rgba(0,229,255,.06),rgba(0,0,0,.4));
+  display:flex;align-items:center;justify-content:center;font-size:32px;
+}
+
+/* 內容區 */
+.tile-body{padding:16px 18px 18px;}
+.tile-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;}
+.tile-id{font-size:13px;color:#00FFFF;letter-spacing:1px;font-family:'Arial',sans-serif;}
+.tile-rag{font-size:13px;font-weight:700;padding:4px 12px;border-radius:2px;letter-spacing:.5px;}
+.tile-rag.R{background:rgba(255,61,61,.15);color:var(--red);}
+.tile-rag.A{background:rgba(255,179,0,.15);color:var(--amber);}
+.tile-rag.G{background:rgba(0,230,118,.15);color:var(--green);}
+.tile-name{font-size:18px;font-weight:700;color:var(--text);margin-bottom:3px;line-height:1.3;}
+.tile-client{font-size:14px;color:#A8C4D8;margin-bottom:12px;}
+
+/* KPI 行 */
+.tile-kpis{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.tile-kpi{background:rgba(0,0,0,.3);border-radius:3px;padding:10px 12px;}
+.tile-kpi-label{font-size:12px;color:#8BAAC8;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+.tile-kpi-value{font-size:22px;font-weight:700;font-family:'Arial',sans-serif;line-height:1;}
+.tile-kpi-delta{font-size:13px;margin-top:3px;}
+
+/* 進度條 */
+.tile-progress{margin-top:10px;}
+.tile-prog-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.tile-prog-label{font-size:13px;color:#A8C4D8;width:48px;flex-shrink:0;}
+.tile-prog-bg{flex:1;height:8px;background:rgba(255,255,255,.08);border-radius:2px;}
+.tile-prog-fill{height:100%;border-radius:2px;}
+.tile-prog-val{font-size:14px;font-weight:700;font-family:'Arial',sans-serif;min-width:42px;text-align:right;}
+
+/* Alert tag */
+.tile-alert{margin-top:10px;font-size:16px;font-weight:600;color:#FF8080;
+  background:rgba(255,61,61,.08);border:1px solid rgba(255,61,61,.15);
+  border-radius:2px;padding:7px 12px;letter-spacing:.3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tile-alert.ok{color:#00E676;background:rgba(0,230,118,.06);border-color:rgba(0,230,118,.15);}
+.tile-alert.warn{color:var(--amber);background:rgba(255,179,0,.06);border-color:rgba(255,179,0,.15);}
+
+.adv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+.adv-grid-wide{display:grid;grid-template-columns:1.1fr 1.9fr;gap:12px;margin-bottom:16px;}
+
+/* Gauge ring */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0;}
+.gauge-ring{position:relative;width:160px;height:160px;}
+.gauge-ring canvas{position:absolute;top:0;left:0;}
+.gauge-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;}
+.gauge-val{font-size:32px;font-weight:700;font-family:inherit;line-height:1;}
+.gauge-lbl{font-size:11px;color:#A8C4D8;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.gauge-row{display:flex;gap:20px;justify-content:center;margin-top:8px;}
+.gauge-item{text-align:center;}
+.gauge-item-val{font-size:15px;font-weight:700;font-family:inherit;}
+.gauge-item-lbl{font-size:10px;color:#A8C4D8;letter-spacing:1px;}
+
+/* Gantt */
+.gantt-wrap{padding:4px 0;}
+.gantt-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.gantt-label{font-size:12px;color:#A8C4D8;width:80px;flex-shrink:0;letter-spacing:.5px;text-align:right;}
+.gantt-track{flex:1;height:22px;background:rgba(255,255,255,.06);border-radius:2px;position:relative;overflow:visible;}
+.gantt-bar{height:100%;border-radius:2px;position:absolute;top:0;
+  display:flex;align-items:center;padding-left:8px;
+  font-size:11px;font-weight:700;letter-spacing:.5px;overflow:hidden;white-space:nowrap;}
+.gantt-today{position:absolute;top:-4px;bottom:-4px;width:2px;background:#fff;opacity:.5;z-index:2;}
+.gantt-today-lbl{position:absolute;top:-18px;font-size:10px;color:#fff;opacity:.7;
+  transform:translateX(-50%);white-space:nowrap;}
+.gantt-legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;}
+.gantt-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#A8C4D8;}
+.gantt-legend-dot{width:12px;height:4px;border-radius:1px;}
+
+/* EAC Trend */
+.eac-warn-zone{background:rgba(255,61,61,.06);border:1px solid rgba(255,61,61,.15);
+  border-radius:2px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#FF8080;display:flex;align-items:center;gap:8px;}
+
+/* Health score */
+.health-score-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0;}
+.health-score-num{font-size:64px;font-weight:700;font-family:'Arial',sans-serif;line-height:1;}
+.health-score-lbl{font-size:14px;letter-spacing:2px;text-transform:uppercase;}
+.health-dims{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%;margin-top:8px;}
+.health-dim{background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:2px;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;}
+.health-dim-name{font-size:12px;color:#A8C4D8;}
+.health-dim-score{font-size:16px;font-weight:700;font-family:'Arial',sans-serif;}
+
+.detail-hero{
+  padding:24px 28px 20px;
+  border-bottom:1px solid var(--border);
+  background:rgba(0,229,255,.03);
+  position:relative;overflow:hidden;
+  min-height:130px;
+}
+.detail-hero::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+}
+.detail-scan{
+  position:absolute;top:0;left:0;right:0;height:1px;
+  background:rgba(0,229,255,.5);
+  animation:scanH 3s linear infinite;
+}
+.detail-rag{margin-bottom:8px;}
+.detail-proj-name{
+  font-size:30px;font-weight:700;color:var(--cyan);
+  letter-spacing:1px;margin-bottom:5px;
+  text-shadow:var(--glow-c);
+}
+.detail-meta{
+  font-size:15px;color:#A8C4D8;
+  display:flex;gap:20px;flex-wrap:wrap;letter-spacing:1px;
+}
+
+/* Detail KPI */
+.dkpi-grid{
+  display:grid;grid-template-columns:repeat(5,1fr);
+  border-bottom:1px solid var(--border);
+}
+.dkpi{
+  padding:20px 24px;border-right:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.dkpi:last-child{border-right:none;}
+.dkpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.dkpi.red::before{background:var(--red);box-shadow:var(--glow-r);}
+.dkpi.amber::before{background:var(--amber);}
+.dkpi.green::before{background:var(--green);box-shadow:var(--glow-g);}
+.dkpi.cyan::before{background:var(--cyan);box-shadow:var(--glow-c);}
+.dkpi-label{font-size:14px;color:#C8DDEF;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;font-weight:600;}
+.dkpi-value{font-size:42px;font-weight:700;line-height:1;margin-bottom:4px;font-family:'Arial',sans-serif;}
+.dkpi-sub{font-size:15px;color:#A8C4D8;letter-spacing:.5px;}
+.dkpi-tag{display:inline-block;margin-top:10px;font-size:15px;font-weight:700;padding:2px 8px;border-radius:2px;letter-spacing:1px;text-transform:uppercase;}
+.dkpi-tag.neg{background:rgba(255,61,61,.12);color:var(--red);}
+.dkpi-tag.warn{background:rgba(255,179,0,.12);color:var(--amber);}
+.dkpi-tag.pos{background:rgba(0,230,118,.12);color:var(--green);}
+
+/* Charts */
+.detail-section{padding:16px 24px 0;position:relative;z-index:1;}
+.section-label{
+  font-size:16px;font-weight:700;color:#00FFFF;
+  letter-spacing:3px;text-transform:uppercase;
+  border-left:2px solid var(--cyan);padding-left:10px;
+  margin-bottom:12px;text-shadow:var(--glow-c);
+}
+.chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.chart-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;}
+.chart-card{
+  background:rgba(13,17,23,.8);
+  border:1px solid var(--border);padding:16px;
+  position:relative;overflow:hidden;
+}
+.chart-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  opacity:.4;
+}
+.chart-card-title{font-size:17px;font-weight:700;color:#00FFFF;margin-bottom:2px;letter-spacing:1px;}
+.chart-card-sub{font-size:14px;color:#A8C4D8;margin-bottom:12px;letter-spacing:1px;}
+
+/* Progress bars */
+.prog-item{margin-bottom:12px;}
+.prog-hd{display:flex;justify-content:space-between;font-size:15px;margin-bottom:5px;letter-spacing:.5px;}
+.prog-label{color:#A8C4D8;}
+.prog-val{font-weight:700;font-family:'Arial',sans-serif;}
+.prog-bg{height:12px;background:rgba(255,255,255,.06);border-radius:1px;position:relative;overflow:visible;}
+.prog-fill{height:100%;border-radius:2px;}
+.prog-marker{position:absolute;top:-3px;width:1px;height:12px;background:rgba(255,255,255,.4);}
+.prog-marker-tip{position:absolute;top:-18px;font-size:12px;color:#A8C4D8;transform:translateX(-50%);white-space:nowrap;}
+
+/* Alert table */
+.alert-tbl{width:100%;border-collapse:collapse;font-size:14px;}
+.alert-tbl th{font-size:14px;color:#00FFFF;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  padding:7px 10px;border-bottom:1px solid rgba(0,229,255,.2);text-align:left;}
+.alert-tbl td{padding:12px 14px;border-bottom:1px solid rgba(0,229,255,.08);letter-spacing:.5px;font-size:14px;}
+.pill{padding:4px 12px;border-radius:2px;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;}
+.pill.R{background:rgba(255,61,61,.12);color:var(--red);}
+.pill.A{background:rgba(255,179,0,.12);color:var(--amber);}
+.pill.G{background:rgba(0,230,118,.12);color:var(--green);}
+
+
+/* ── SAP LOGO ─────────────────────────────────── */
+.sap-badge{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(0,112,205,.12);
+  border:1px solid rgba(0,112,205,.35);
+  border-radius:4px;padding:4px 12px 4px 6px;
+}
+.sap-badge img{height:22px;width:auto;border-radius:2px;}
+.sap-badge-text{
+  display:flex;flex-direction:column;
+  line-height:1.2;
+}
+.sap-badge-powered{font-size:9px;color:#7BB8E8;letter-spacing:1.5px;text-transform:uppercase;font-family:'Arial',sans-serif;}
+.sap-badge-product{font-size:11px;font-weight:700;color:#00A0E0;letter-spacing:.5px;font-family:'Arial',sans-serif;}
+
+/* SAP footer badge */
+.sap-footer-badge{
+  display:flex;align-items:center;gap:6px;
+}
+.sap-footer-badge img{height:18px;width:auto;opacity:.8;border-radius:2px;}
+.sap-footer-badge span{font-size:11px;color:#5A8AAA;letter-spacing:1px;font-family:'Arial',sans-serif;}
+
+/* ── GENIE DRAWER ─────────────────────────────── */
+.genie-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;backdrop-filter:blur(4px);}
+.genie-overlay.open{display:block;}
+.genie-drawer{
+  position:fixed;top:0;right:-560px;width:540px;height:100vh;
+  background:rgba(8,11,18,.97);z-index:700;
+  display:flex;flex-direction:column;
+  border-left:1px solid rgba(0,229,255,.2);
+  box-shadow:-8px 0 40px rgba(0,0,0,.8);
+  transition:right .3s cubic-bezier(.4,0,.2,1);
+}
+.genie-drawer::before{
+  content:'';position:absolute;top:0;left:0;bottom:0;width:1px;
+  background:linear-gradient(to bottom,transparent,var(--cyan),transparent);
+  opacity:.4;
+}
+.genie-drawer.open{right:0;}
+
+.genie-header{
+  background:linear-gradient(135deg,rgba(255,54,33,.15),rgba(255,140,0,.1));
+  border-bottom:1px solid rgba(255,87,34,.2);
+  padding:14px 18px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.genie-header-left{display:flex;align-items:center;gap:12px;}
+.genie-logo-box{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,#FF3621,#FF8C00);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.genie-header-title{font-size:18px;font-weight:700;color:#fff;letter-spacing:2px;text-transform:uppercase;}
+.genie-header-sub{font-size:13px;color:rgba(255,200,150,.7);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+.genie-close{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);color:var(--muted);
+  width:28px;height:28px;border-radius:2px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;}
+.genie-close:hover{color:#fff;border-color:var(--red);}
+
+.genie-context{
+  background:rgba(0,229,255,.05);border-bottom:1px solid var(--border);
+  padding:12px 18px;font-size:15px;color:var(--cyan);
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+  letter-spacing:1px;
+}
+.genie-chips-wrap{padding:12px 18px 8px;flex-shrink:0;border-bottom:1px solid var(--border);}
+.genie-chips-label{font-size:14px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.genie-chips{display:flex;flex-wrap:wrap;gap:5px;}
+.genie-chip{
+  padding:7px 14px;border-radius:2px;font-size:14px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--muted);
+  font-family:'Arial','PingFang TC',sans-serif;letter-spacing:.5px;transition:all .15s;
+}
+.genie-chip:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.06);}
+.genie-chip.active{background:rgba(255,87,34,.15);border-color:var(--orange);color:var(--orange-g);}
+
+.genie-input-wrap{padding:10px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.genie-input-row{display:flex;gap:8px;align-items:flex-end;}
+.genie-textarea{
+  flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:2px;
+  font-size:15px;font-family:'Arial','PingFang TC',sans-serif;color:var(--text);resize:none;
+  background:rgba(0,229,255,.03);line-height:1.5;min-height:76px;outline:none;letter-spacing:.5px;
+}
+.genie-textarea:focus{border-color:var(--cyan);box-shadow:var(--glow-c);}
+.genie-send-btn{
+  background:linear-gradient(135deg,var(--orange),var(--amber));color:#fff;border:none;
+  padding:12px 18px;border-radius:2px;cursor:pointer;font-size:16px;font-weight:700;
+  white-space:nowrap;font-family:'Arial',sans-serif;letter-spacing:1px;text-transform:uppercase;
+  height:76px;box-shadow:var(--glow-o);
+}
+.genie-send-btn:disabled{background:rgba(255,255,255,.1);box-shadow:none;cursor:default;}
+
+.genie-sql-wrap{margin:0 18px;background:rgba(0,0,0,.6);border:1px solid rgba(0,229,255,.1);display:none;flex-shrink:0;}
+.genie-sql-wrap.show{display:block;}
+.genie-sql-bar{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:rgba(0,229,255,.05);border-bottom:1px solid var(--border);}
+.genie-sql-bar span{font-size:13px;color:var(--cyan);letter-spacing:2px;}
+.genie-sql-copy{font-size:9px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;}
+.genie-sql-code{padding:12px 14px;font-size:14px;font-family:'Courier New','Consolas',monospace;color:#6EE7B7;line-height:1.6;white-space:pre-wrap;}
+
+.genie-results{flex:1;overflow-y:auto;padding:12px 18px 20px;}
+.genie-results::-webkit-scrollbar{width:4px;}
+.genie-results::-webkit-scrollbar-track{background:transparent;}
+.genie-results::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:2px;}
+
+.genie-loading{display:none;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:10px;}
+.genie-loading.show{display:flex;}
+.genie-spinner{width:30px;height:30px;border:2px solid rgba(0,229,255,.15);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite;}
+.genie-loading-text{font-size:15px;color:var(--cyan);letter-spacing:2px;text-transform:uppercase;}
+.genie-loading-steps{font-size:14px;color:var(--muted);letter-spacing:1px;}
+
+.genie-result-wrap{display:none;animation:fadeIn .4s ease;}
+.genie-result-wrap.show{display:block;}
+
+.genie-section-title{
+  font-size:14px;font-weight:700;color:var(--cyan);text-transform:uppercase;
+  letter-spacing:2px;margin:12px 0 8px;display:flex;align-items:center;gap:6px;
+}
+.genie-section-title::after{content:'';flex:1;height:1px;background:rgba(0,229,255,.15);}
+
+.insight-card{
+  background:rgba(13,17,23,.8);border:1px solid var(--border);
+  border-radius:2px;padding:11px 13px;margin-bottom:7px;border-left:2px solid;
+}
+.insight-card.critical{border-left-color:var(--red);}
+.insight-card.warning{border-left-color:var(--amber);}
+.insight-card.positive{border-left-color:var(--green);}
+.insight-card.info{border-left-color:var(--cyan);}
+.insight-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:5px;display:flex;align-items:center;gap:6px;letter-spacing:.5px;}
+.insight-body{font-size:14px;color:var(--muted);line-height:1.7;letter-spacing:.3px;}
+.insight-badge{font-size:13px;font-weight:700;padding:1px 6px;border-radius:2px;text-transform:uppercase;letter-spacing:1px;}
+.badge-critical{background:rgba(255,61,61,.15);color:var(--red);}
+.badge-warning{background:rgba(255,179,0,.15);color:var(--amber);}
+.badge-positive{background:rgba(0,230,118,.15);color:var(--green);}
+.badge-info{background:rgba(0,229,255,.1);color:var(--cyan);}
+
+.action-item{display:flex;gap:9px;align-items:flex-start;padding:9px 11px;
+  background:rgba(13,17,23,.6);border:1px solid var(--border);border-radius:2px;margin-bottom:5px;}
+.action-num{min-width:20px;height:20px;border-radius:50%;background:var(--orange);color:#fff;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.action-text{font-size:14px;color:var(--text);line-height:1.5;letter-spacing:.3px;font-family:'Arial','PingFang TC',sans-serif;}
+.action-tag{font-size:13px;font-weight:700;padding:1px 6px;border-radius:2px;margin-left:5px;letter-spacing:1px;text-transform:uppercase;}
+.tag-now{background:rgba(255,61,61,.15);color:var(--red);}
+.tag-week{background:rgba(255,179,0,.15);color:var(--amber);}
+.tag-month{background:rgba(0,229,255,.1);color:var(--cyan);}
+
+/* ── FOOTER ───────────────────────────────────── */
+.page-footer{
+  background:rgba(8,11,18,.95);border-top:1px solid var(--border);
+  font-size:14px;padding:10px 24px;letter-spacing:2px;text-transform:uppercase;
+  display:flex;justify-content:space-between;color:var(--muted);
+  position:relative;z-index:1;
+}
+.footer-brand{color:var(--cyan);}
+
+/* ── AI HEALTH REPORT ─────────────────────────── */
+.report-section{
+  padding:20px 24px 28px;
+  background:linear-gradient(180deg,rgba(8,11,18,.95),rgba(13,17,23,.98));
+  border-top:2px solid rgba(255,87,34,.3);
+  position:relative;z-index:1;
+}
+.report-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;
+}
+.report-title{
+  display:flex;align-items:center;gap:12px;
+}
+.report-title-icon{
+  width:42px;height:42px;border-radius:8px;
+  background:linear-gradient(135deg,#FF3621,#FF8C00);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;box-shadow:0 0 16px rgba(255,54,33,.5);
+  flex-shrink:0;
+}
+.report-title-text{font-size:18px;font-weight:700;color:#fff;letter-spacing:.5px;}
+.report-title-sub{font-size:13px;color:#FF8A50;letter-spacing:1px;margin-top:2px;text-transform:uppercase;}
+.report-gen-btn{
+  display:flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,#FF3621,#FF8C00);
+  color:#fff;border:none;cursor:pointer;
+  padding:10px 24px;border-radius:4px;font-size:15px;font-weight:700;
+  font-family:'Arial',sans-serif;letter-spacing:.5px;
+  box-shadow:0 0 20px rgba(255,54,33,.5);transition:all .2s;
+}
+.report-gen-btn:hover{box-shadow:0 0 32px rgba(255,54,33,.8);transform:translateY(-1px);}
+.report-gen-btn:disabled{background:rgba(255,255,255,.1);box-shadow:none;cursor:default;transform:none;}
+
+/* 流程步驟條 */
+.report-flow{
+  display:flex;align-items:center;gap:0;
+  margin-bottom:16px;background:rgba(0,0,0,.3);
+  border:1px solid var(--border);border-radius:4px;
+  overflow:hidden;
+}
+.report-flow-step{
+  flex:1;padding:8px 12px;text-align:center;
+  font-size:11px;font-weight:700;color:#8BAAC8;
+  letter-spacing:.5px;font-family:'Arial',sans-serif;
+  border-right:1px solid var(--border);
+  transition:all .3s;position:relative;
+}
+.report-flow-step:last-child{border-right:none;}
+.report-flow-step.active{background:rgba(255,87,34,.15);color:#FF8A50;}
+.report-flow-step.done{background:rgba(0,230,118,.08);color:#00E676;}
+.report-flow-step .step-icon{font-size:14px;display:block;margin-bottom:2px;}
+
+/* 報告內容 */
+.report-output{display:none;animation:fadeIn .5s ease;}
+.report-output.show{display:block;}
+.report-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.report-block{
+  background:rgba(0,0,0,.35);border:1px solid var(--border);
+  border-radius:4px;padding:16px 18px;
+}
+.report-block-title{
+  font-size:16px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+  font-family:'Arial',sans-serif;
+}
+.report-block-body{font-size:17px;color:#C8DDEF;line-height:2.0;font-family:'Arial','PingFang TC',sans-serif;}
+.report-block-body strong{font-weight:700;}
+
+/* 行動方案 */
+.action-list{display:flex;flex-direction:column;gap:8px;}
+.action-row{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:10px 14px;border-radius:3px;
+  background:rgba(255,255,255,.03);border:1px solid var(--border);
+}
+.action-badge{
+  font-size:14px;font-weight:700;padding:3px 12px;border-radius:10px;
+  white-space:nowrap;flex-shrink:0;margin-top:1px;font-family:'Arial',sans-serif;
+}
+.badge-now{background:rgba(255,61,61,.2);color:#FF3D3D;border:1px solid rgba(255,61,61,.3);}
+.badge-week{background:rgba(255,179,0,.2);color:#FFB300;border:1px solid rgba(255,179,0,.3);}
+.badge-month{background:rgba(0,229,255,.15);color:#00FFFF;border:1px solid rgba(0,229,255,.25);}
+.action-row-text{font-size:17px;color:#C8DDEF;line-height:1.8;font-family:'Arial','PingFang TC',sans-serif;}
+
+/* 追蹤區 */
+.report-track{
+  background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);
+  border-radius:4px;padding:14px 18px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+}
+.track-item{text-align:center;}
+.track-label{font-size:14px;color:#A8C4D8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Arial',sans-serif;}
+.track-val{font-size:28px;font-weight:700;font-family:'Arial',sans-serif;line-height:1;}
+.track-sub{font-size:14px;color:#A8C4D8;margin-top:4px;}
+
+/* 報告匯出列 */
+.report-actions{
+  display:flex;align-items:center;gap:10px;margin-top:14px;
+  padding-top:14px;border-top:1px solid var(--border);
+}
+.report-export-btn{
+  font-size:13px;font-weight:700;cursor:pointer;
+  border:1px solid rgba(0,229,255,.3);background:rgba(0,229,255,.08);
+  color:#00FFFF;padding:7px 18px;border-radius:3px;
+  font-family:'Arial',sans-serif;letter-spacing:.5px;
+}
+.report-export-btn:hover{background:rgba(0,229,255,.15);}
+.report-timestamp{font-size:11px;color:#8BAAC8;margin-left:auto;letter-spacing:.5px;}
+
+@media(max-width:1000px){
+  .dkpi-grid,.summary-strip{grid-template-columns:repeat(3,1fr);}
+  .chart-grid-2,.chart-grid-3{grid-template-columns:1fr;}
+}
+
+/* ── AUTO DIAGNOSIS PANEL ────────────────────── */
+.diag-card{background:rgba(13,17,23,.85);border:1px solid var(--border);border-radius:4px;padding:16px 18px;position:relative;overflow:hidden;}
+.diag-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.diag-card.d-critical::before{background:var(--red);}
+.diag-card.d-warning::before{background:var(--amber);}
+.diag-card.d-ok::before{background:var(--green);}
+.diag-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.diag-title{font-size:16px;font-weight:700;color:#C8DDEF;}
+.diag-badge{font-size:13px;font-weight:700;padding:3px 10px;border-radius:3px;text-transform:uppercase;}
+.diag-badge.critical{background:rgba(255,61,61,.15);color:var(--red);}
+.diag-badge.warning{background:rgba(255,179,0,.15);color:var(--amber);}
+.diag-badge.ok{background:rgba(0,230,118,.12);color:var(--green);}
+.diag-value{font-size:32px;font-weight:700;font-family:'Arial',sans-serif;margin-bottom:3px;}
+.diag-value-sub{font-size:14px;color:#8BAAC8;margin-bottom:8px;}
+.diag-divider{height:1px;background:rgba(0,229,255,.08);margin:10px 0;}
+.diag-section-lbl{font-size:13px;font-weight:700;color:#8BAAC8;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.diag-item{font-size:14px;color:#C8DDEF;padding:2px 0;display:flex;gap:6px;line-height:1.5;}
+.diag-item.reason::before{content:'▸';color:var(--amber);flex-shrink:0;}
+.diag-item.action::before{content:'→';color:var(--green);flex-shrink:0;font-weight:700;}
+.diag-sys-warn{font-size:13px;color:var(--amber);background:rgba(255,179,0,.08);border:1px solid rgba(255,179,0,.2);border-radius:3px;padding:4px 8px;margin:6px 0;}
+
+
+
+/* ── FLOATING NAV JS ─────────────────────────── */
+function navTo(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  // highlight active
+  document.querySelectorAll('.float-nav-btn').forEach(b=>b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+function showFloatNav(){ document.getElementById('detail-float-nav').style.display='flex'; }
+function hideFloatNav(){ document.getElementById('detail-float-nav').style.display='none'; }
+
+// 滾動時更新 active 狀態
+function updateNavActive(){
+  const sections = [
+    {id:'d-kpi-section',   idx:0},
+    {id:'row1-section',    idx:1},
+    {id:'row2-section',    idx:2},
+    {id:'row3-section',    idx:3},
+    {id:'cost-drill-section', idx:4},
+    {id:'diag-section',    idx:5},
+    {id:'pm-section',      idx:6},
+  ];
+  const btns = document.querySelectorAll('.float-nav-btn');
+  let current = 0;
+  sections.forEach(s=>{
+    const el = document.getElementById(s.id);
+    if(el && el.getBoundingClientRect().top <= 120) current = s.idx;
+  });
+  btns.forEach((b,i)=>b.classList.toggle('active', i===current));
+}
+window.addEventListener('scroll', updateNavActive, {passive:true});
+
+/* ── PM COMMENT MECHANISM ───────────────────── */
+const PM_STORAGE_KEY = 'ctci_pm_comments';
+
+function loadComments(){
+  try{ return JSON.parse(localStorage.getItem(PM_STORAGE_KEY)||'{}'); }
+  catch(e){ return {}; }
+}
+function saveComment(projId, triggerKey, text){
+  const all = loadComments();
+  if(!all[projId]) all[projId]={};
+  if(!all[projId][triggerKey]) all[projId][triggerKey]=[];
+  all[projId][triggerKey].unshift({
+    text, ts: new Date().toLocaleString('zh-TW',{hour12:false})
+  });
+  // 只保留最近 5 筆
+  all[projId][triggerKey] = all[projId][triggerKey].slice(0,5);
+  localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(all));
+}
+function exportComments(){
+  const data = loadComments();
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'ctci_pm_comments_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importComments(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(data));
+      alert('匯入成功！請重新點選專案查看紀錄。');
+    }catch(err){ alert('匯入失敗：JSON 格式錯誤'); }
+  };
+  reader.readAsText(file);
+}
+
+function renderPMComments(p){
+  const stored = loadComments();
+  const projComments = stored[p.id] || {};
+
+  // ── 六大觸發條件 ──────────────────────────────
+  const triggers = [];
+
+  // T1: 成本差大（認列成本差異 > 10%）
+  const costBcmsEst = p.cost_pct/100 * p.contract_budget;
+  const costDiffPct = Math.abs(p.cost_acc - costBcmsEst) / Math.max(costBcmsEst,1) * 100;
+  if(costDiffPct > 10) triggers.push({
+    key:'T1_cost_diff',
+    severity:'critical',
+    icon:'⚠',
+    label:'成本差異過大（需 PM 說明）',
+    val: (p.cost_acc-costBcmsEst>=0?'+':'')+( p.cost_acc-costBcmsEst).toFixed(1)+' M（'+costDiffPct.toFixed(1)+'%）',
+    valColor:'#FF3D3D',
+    placeholder:'請說明認列成本與 BCMS 成本差異的原因，以及改善計畫...',
+  });
+
+  // T2: 進度差大（成本進度 - 自評進度 > 8pp）
+  const progDiff = p.cost_pct - p.self_pct;
+  if(Math.abs(progDiff) > 8) triggers.push({
+    key:'T2_prog_diff',
+    severity: progDiff > 0 ? 'critical' : 'warning',
+    icon:'📉',
+    label:`進度落後說明（成本 vs 自評差 ${Math.abs(progDiff).toFixed(1)}pp，需 PM 說明）`,
+    val: (progDiff>=0?'+':'')+progDiff.toFixed(1)+'pp',
+    valColor: progDiff > 0 ? '#FF3D3D' : '#FFB300',
+    placeholder:'請說明進度落後的具體原因，以及預計趕工計畫...',
+  });
+
+  // T3: 應請未請（收款缺口 < -5M）
+  if(p.billing_gap < -5) triggers.push({
+    key:'T3_billing',
+    severity:'warning',
+    icon:'💳',
+    label:`應請未請金額過大（${p.billing_gap.toFixed(1)} M，需 PM 說明）`,
+    val: p.billing_gap.toFixed(1)+' M',
+    valColor:'#FFB300',
+    placeholder:'請說明尚未請款的原因（如：驗收文件未備齊、客戶審核中...），以及預計送件時程...',
+  });
+
+  // T4: 人員成本差大（工時實際 > Budget 15%）
+  const mhOverPct = (p.mh_actual - p.mh_budget) / Math.max(p.mh_budget,1) * 100;
+  if(mhOverPct > 15) triggers.push({
+    key:'T4_mh_over',
+    severity:'critical',
+    icon:'👷',
+    label:`人員成本超支（工時超 ${mhOverPct.toFixed(0)}%，需 PM 說明及改善方法）`,
+    val: '實際 '+(p.mh_actual/1000).toFixed(1)+'K MH vs Budget '+(p.mh_budget/1000).toFixed(1)+'K MH',
+    valColor:'#FF3D3D',
+    placeholder:'請說明人工工時超支原因，以及後續人力管控改善措施...',
+  });
+
+  // T5: 外包比例過大（發包實際 > 直接成本總額 60%）
+  const totalDirect = p.mat_actual + p.sub_actual + p.mh_actual/1000;
+  const subRatio = totalDirect > 0 ? p.sub_actual / totalDirect * 100 : 0;
+  if(subRatio > 60) triggers.push({
+    key:'T5_sub_ratio',
+    severity:'warning',
+    icon:'🏗',
+    label:`外包比例過高（${subRatio.toFixed(0)}% > 60%，需 PM 說明原因及改善方法）`,
+    val: '發包 '+p.sub_actual.toFixed(1)+'M / 直接成本 '+totalDirect.toFixed(1)+'M = '+subRatio.toFixed(0)+'%',
+    valColor:'#FFB300',
+    placeholder:'請說明外包比例偏高的原因（如：自有人力不足、專業分包需求...），以及是否影響品質管控...',
+  });
+
+  // T6: 進度>90% 但風險準備金仍>70%
+  const riskUsedPct = p.risk_cur / p.risk_base * 100;
+  if(p.schedule_pct > 90 && riskUsedPct > 70) triggers.push({
+    key:'T6_late_risk',
+    severity:'critical',
+    icon:'🛡',
+    label:`尾期風險準備金偏高（工期 ${p.schedule_pct.toFixed(0)}% 但風險金仍 ${riskUsedPct.toFixed(0)}%，需 PM 說明）`,
+    val: `工期 ${p.schedule_pct.toFixed(0)}%，風險準備金 ${(p.risk_cur/100).toFixed(0)}萬（${(p.risk_cur/p.risk_base).toFixed(1)}×）`,
+    valColor:'#FF3D3D',
+    placeholder:'請說明工程進入尾期但風險準備金仍偏高的原因，預計如何使用或釋回...',
+  });
+
+  // ── 無觸發項目時 ──────────────────────────────
+  if(triggers.length === 0){
+    document.getElementById('d-pm-triggers').innerHTML =
+      `<div style="padding:16px 18px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);
+        border-radius:4px;font-size:13px;color:var(--green);">
+        ✅ 本案目前無需 PM 說明的異常項目，各指標均在合理範圍內。
+      </div>`;
+    return;
+  }
+
+  // ── 渲染觸發項目 ────────────────────────────
+  document.getElementById('d-pm-triggers').innerHTML = triggers.map(t=>{
+    const history = projComments[t.key] || [];
+    const historyHTML = history.length > 0
+      ? `<div class="pm-history">${history.map(h=>
+          `<div class="pm-history-item">
+            ${h.text}
+            <div class="pm-history-meta">${h.ts}</div>
+          </div>`).join('')}
+        </div>`
+      : `<div style="font-size:11px;color:#8BAAC8;padding:4px 0;">尚無說明紀錄</div>`;
+
+    return `<div class="pm-trigger-item ${t.severity}">
+      <div class="pm-trigger-header">
+        <div class="pm-trigger-label">
+          <span>${t.icon}</span>
+          <span>${t.label}</span>
+        </div>
+        <span class="pm-trigger-val" style="color:${t.valColor}">${t.val}</span>
+      </div>
+      <div style="font-size:10px;color:#8BAAC8;margin-bottom:6px;font-weight:700;">
+        歷史說明紀錄：
+      </div>
+      ${historyHTML}
+      <div style="margin-top:8px;">
+        <div style="font-size:10px;color:#8BAAC8;margin-bottom:4px;font-weight:700;">新增 PM 說明：</div>
+        <textarea class="pm-comment-area" id="pm-input-${t.key}"
+          placeholder="${t.placeholder}"></textarea>
+        <button class="pm-save-btn" onclick="savePMComment('${p.id}','${t.key}')">
+          💾 儲存說明
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function savePMComment(projId, triggerKey){
+  const el = document.getElementById('pm-input-'+triggerKey);
+  if(!el || !el.value.trim()){ alert('請先輸入說明內容'); return; }
+  saveComment(projId, triggerKey, el.value.trim());
+  el.value = '';
+  // 重新渲染
+  const p = PROJECTS.find(x=>x.id===projId);
+  if(p) renderPMComments(p);
+  // 短暫提示
+  const btn = document.querySelector(`[onclick="savePMComment('${projId}','${triggerKey}')"]`);
+  if(btn){ btn.textContent='✓ 已儲存'; setTimeout(()=>btn.textContent='💾 儲存說明',1500); }
+}
+
+/* ── COST DRILLDOWN ──────────────────────────── */
+.cost-drill-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px;}
+.cost-card{background:rgba(13,17,23,.85);border:1px solid var(--border);border-radius:4px;padding:14px 16px;position:relative;}
+.cost-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.cost-card.over::before{background:var(--red);}
+.cost-card.warn::before{background:var(--amber);}
+.cost-card.ok::before{background:var(--green);}
+.cost-card-title{font-size:18px;font-weight:700;color:#C8DDEF;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.cost-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,229,255,.06);}
+.cost-row:last-child{border-bottom:none;}
+.cost-row-label{font-size:17px;color:#8BAAC8;}
+.cost-row-val{font-size:18px;font-weight:700;font-family:'Arial',sans-serif;}
+.cost-row-val.over{color:var(--red);}
+.cost-row-val.warn{color:var(--amber);}
+.cost-row-val.ok{color:var(--green);}
+.cost-row-val.neutral{color:#C8DDEF;}
+.cost-bar-wrap{margin-top:8px;}
+.cost-bar-label{display:flex;justify-content:space-between;font-size:15px;color:#8BAAC8;margin-bottom:3px;}
+.cost-bar-bg{height:13px;background:rgba(255,255,255,.08);border-radius:2px;position:relative;}
+.cost-bar-fill{height:100%;border-radius:2px;transition:width .6s ease;}
+.cost-bar-over{position:absolute;top:0;right:0;height:100%;background:rgba(255,61,61,.5);border-radius:0 2px 2px 0;}
+.cost-summary-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.cost-summary-chip{padding:10px 18px;border-radius:3px;font-size:26px;font-weight:700;font-family:'Arial',sans-serif;}
+.indirect-section{background:rgba(13,17,23,.85);border:1px solid var(--border);border-radius:4px;padding:14px 16px;}
+.indirect-title{font-size:18px;font-weight:700;color:#C8DDEF;margin-bottom:10px;}
+.indirect-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.indirect-item{background:rgba(0,0,0,.3);border-radius:3px;padding:8px 10px;text-align:center;}
+.indirect-item-label{font-size:16px;color:#8BAAC8;margin-bottom:3px;}
+.indirect-item-val{font-size:26px;font-weight:700;font-family:'Arial',sans-serif;color:#C8DDEF;}
+
+
+/* ── FLOATING NAV JS ─────────────────────────── */
+function navTo(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  // highlight active
+  document.querySelectorAll('.float-nav-btn').forEach(b=>b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+function showFloatNav(){ document.getElementById('detail-float-nav').style.display='flex'; }
+function hideFloatNav(){ document.getElementById('detail-float-nav').style.display='none'; }
+
+// 滾動時更新 active 狀態
+function updateNavActive(){
+  const sections = [
+    {id:'d-kpi-section',   idx:0},
+    {id:'row1-section',    idx:1},
+    {id:'row2-section',    idx:2},
+    {id:'row3-section',    idx:3},
+    {id:'cost-drill-section', idx:4},
+    {id:'diag-section',    idx:5},
+    {id:'pm-section',      idx:6},
+  ];
+  const btns = document.querySelectorAll('.float-nav-btn');
+  let current = 0;
+  sections.forEach(s=>{
+    const el = document.getElementById(s.id);
+    if(el && el.getBoundingClientRect().top <= 120) current = s.idx;
+  });
+  btns.forEach((b,i)=>b.classList.toggle('active', i===current));
+}
+window.addEventListener('scroll', updateNavActive, {passive:true});
+
+/* ── PM COMMENT MECHANISM ───────────────────── */
+.pm-trigger-item{
+  background:rgba(13,17,23,.85);border:1px solid var(--border);
+  border-radius:4px;padding:14px 16px;margin-bottom:10px;
+  border-left:3px solid var(--amber);
+}
+.pm-trigger-item.critical{border-left-color:var(--red);}
+.pm-trigger-item.ok{border-left-color:var(--green);opacity:.6;}
+.pm-trigger-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px;}
+.pm-trigger-label{font-size:16px;font-weight:700;color:#C8DDEF;display:flex;align-items:center;gap:8px;}
+.pm-trigger-val{font-size:15px;font-weight:700;font-family:'Arial',sans-serif;}
+.pm-comment-area{width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(0,229,255,.2);
+  border-radius:3px;color:#C8DDEF;font-family:'Arial','PingFang TC',sans-serif;
+  font-size:14px;padding:8px 10px;resize:vertical;min-height:60px;outline:none;
+  box-sizing:border-box;}
+.pm-comment-area:focus{border-color:var(--cyan);}
+.pm-save-btn{
+  background:var(--orange);color:#fff;border:none;cursor:pointer;
+  padding:8px 18px;border-radius:3px;font-size:14px;font-weight:700;
+  font-family:'Arial',sans-serif;margin-top:6px;
+}
+.pm-save-btn:hover{opacity:.85;}
+.pm-history{margin-top:8px;max-height:120px;overflow-y:auto;}
+.pm-history-item{padding:7px 10px;background:rgba(0,229,255,.04);border-radius:3px;
+  margin-bottom:5px;font-size:13px;color:#A8C4D8;border-left:2px solid rgba(0,229,255,.3);}
+.pm-history-meta{font-size:12px;color:#8BAAC8;margin-top:2px;}
+.pm-export-bar{display:flex;gap:8px;padding:10px 0 4px;border-top:1px solid var(--border);margin-top:4px;}
+.pm-export-btn{font-size:13px;font-weight:700;cursor:pointer;
+  border:1px solid rgba(0,229,255,.3);background:rgba(0,229,255,.06);
+  color:#00FFFF;padding:5px 14px;border-radius:3px;font-family:'Arial',sans-serif;}
+.pm-export-btn:hover{background:rgba(0,229,255,.14);}
+.pm-import-label{font-size:13px;font-weight:700;cursor:pointer;
+  border:1px solid rgba(255,179,0,.3);background:rgba(255,179,0,.06);
+  color:var(--amber);padding:5px 14px;border-radius:3px;font-family:'Arial',sans-serif;}
+
+/* ── FLOATING NAV ────────────────────────────── */
+#detail-float-nav{
+  position:fixed;right:0;top:50%;transform:translateY(-50%);
+  z-index:300;display:none;flex-direction:column;gap:2px;
+  background:rgba(8,11,18,.95);
+  border:1px solid rgba(0,229,255,.2);
+  border-right:none;
+  border-radius:8px 0 0 8px;
+  padding:8px 0;
+  box-shadow:-4px 0 20px rgba(0,0,0,.5);
+  backdrop-filter:blur(10px);
+  width:38px;
+  overflow:hidden;
+  transition:width .2s ease;
+}
+#detail-float-nav:hover{width:160px;}
+#detail-float-nav:hover .nav-label{display:inline;}
+#detail-float-nav:hover .float-nav-title{display:block;}
+.float-nav-btn{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:0;cursor:pointer;
+  border:none;background:transparent;
+  color:#8BAAC8;font-family:'Arial',sans-serif;
+  font-size:12px;font-weight:600;white-space:nowrap;
+  transition:background .12s,color .12s;text-align:left;width:100%;
+}
+.float-nav-btn:hover{background:rgba(0,229,255,.12);color:#00FFFF;}
+.float-nav-btn.active{background:rgba(0,229,255,.18);color:#00FFFF;border-left:2px solid #00FFFF;}
+.float-nav-btn .nav-icon{font-size:15px;flex-shrink:0;width:18px;text-align:center;}
+.nav-label{display:none;font-size:12px;}
+.float-nav-divider{height:1px;background:rgba(0,229,255,.1);margin:2px 0;}
+.float-nav-title{display:none;font-size:9px;color:#8BAAC8;letter-spacing:1px;
+  text-transform:uppercase;padding:2px 10px 4px;font-family:'Arial',sans-serif;}
+</style>
+</head>
+<body>
+<div class="sweep-line"></div>
+
+<!-- ── GENIE DRAWER ───────────────────────────── -->
+<div class="genie-overlay" id="genieOverlay" onclick="closeGenie()"></div>
+<div class="genie-drawer" id="genieDrawer">
+  <div class="genie-header">
+    <div class="genie-header-left">
+      <div class="genie-logo-box">✦</div>
+      <div>
+        <div class="genie-header-title">Databricks Genie</div>
+        <div class="genie-header-sub">Text-to-SQL · AI Insights</div>
+      </div>
+    </div>
+    <button class="genie-close" onclick="closeGenie()">✕</button>
+  </div>
+  <div class="genie-context">
+    <span>◈</span><span id="genieContextText">分析範圍：全部 20 個專案</span>
+  </div>
+  <div class="genie-chips-wrap">
+    <div class="genie-chips-label">建議問題</div>
+    <div class="genie-chips" id="genieChips"></div>
+  </div>
+  <div class="genie-input-wrap">
+    <div class="genie-input-row">
+      <textarea class="genie-textarea" id="genieInput"
+        placeholder="輸入自然語言問題，例如：&#10;哪些專案的毛利率下滑超過 5pp？"></textarea>
+      <button class="genie-send-btn" id="genieSendBtn" onclick="runGenie()">執行 ▶</button>
+    </div>
+  </div>
+  <div class="genie-sql-wrap" id="genieSqlWrap">
+    <div class="genie-sql-bar" onclick="toggleSql()" style="cursor:pointer;user-select:none;">
+      <span>▶ GENERATED SQL · DATABRICKS UNITY CATALOG</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="genie-sql-copy" onclick="event.stopPropagation();copySql()">[ 複製 ]</button>
+        <span id="genieSqlToggle" style="font-size:10px;color:var(--cyan);letter-spacing:1px;">▼ 展開</span>
+      </div>
+    </div>
+    <div class="genie-sql-code" id="genieSqlCode" style="display:none;"></div>
+  </div>
+  <div class="genie-results">
+    <div class="genie-loading" id="genieLoading">
+      <div class="genie-spinner"></div>
+      <div class="genie-loading-text" id="genieLoadingText">初始化查詢引擎…</div>
+      <div class="genie-loading-steps" id="genieLoadingSteps"></div>
+    </div>
+    <div class="genie-result-wrap" id="genieResultWrap"></div>
+  </div>
+</div>
+
+<!-- ── TOPBAR ──────────────────────────────────── -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-hex">⚙</div>
+    <div>
+      <div class="logo-name">CTCI ASI · 戰情室</div>
+      <div class="logo-sub">Project War Room · 資料截止 2026/05/31</div>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <span class="dot"></span>
+    <span>SYSTEM ONLINE</span>
+    <span>|</span>
+    <span id="clock"></span>
+  </div>
+  <div class="topbar-right">
+    <button class="back-btn" id="backBtn" onclick="showPortfolio()">◀ 返回總覽</button>
+    <button class="genie-fab" onclick="openGenie()">
+      <span class="genie-fab-icon">✦</span> Genie AI
+    </button>
+    <div class="sap-badge">
+      <img src="sap_logo.png" alt="SAP">
+      <div class="sap-badge-text">
+        <span class="sap-badge-powered">Powered by</span>
+        <span class="sap-badge-product">SAP BDC · Databricks</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PORTFOLIO VIEW
+═══════════════════════════════════════════ -->
+<div id="view-portfolio">
+  <div class="summary-strip" id="summary-strip"></div>
+
+  <!-- ── AI CEO BRIEF ── -->
+  <div id="ai-brief-wrap">
+    <div class="section-hd" style="background:linear-gradient(135deg,rgba(255,87,34,.08),rgba(255,179,0,.06),rgba(0,229,255,.06));border-bottom:1px solid rgba(255,87,34,.2);">
+      <h2 style="color:#FF8A50;">✦ AI Executive Brief — CEO 重點摘要</h2>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="ai-brief-time" style="font-size:11px;color:#8BAAC8;letter-spacing:1px;"></span>
+        <button onclick="refreshAIBrief()" class="collapse-btn" style="border-color:rgba(255,140,0,.4);color:#FF8A50;background:rgba(255,140,0,.08);">↻ 重新整理</button>
+        <button onclick="toggleAIBrief()" id="ai-brief-toggle" class="collapse-btn">▼ 收合</button>
+      </div>
+    </div>
+    <div id="ai-brief-content" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:12px 24px;background:linear-gradient(135deg,rgba(255,87,34,.04),rgba(0,229,255,.03));border-bottom:1px solid var(--border);"></div>
+  </div>
+  <div class="section-hd">
+    <h2>Portfolio Analytics — 圖表分析</h2>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span>OVERVIEW CHARTS</span>
+      <button id="chart-toggle-btn" onclick="togglePortfolioCharts()"
+        class="collapse-btn">▼ 收合</button>
+    </div>
+  </div>
+    </button>
+  <div class="portfolio-charts" id="portfolio-charts-wrap">
+
+    <!-- 1. 毛利率泡泡圖 -->
+    <div class="pchart-card">
+      <div class="pchart-title">📊 毛利率分布 — 合約規模泡泡圖</div>
+      <div class="pchart-sub">泡泡大小 = 合約金額 · 顏色 = 風險等級 · X軸 = 工期進度</div>
+      <canvas id="pf-bubble" height="180"></canvas>
+    </div>
+
+    <!-- 2. 毛利率排行橫條 -->
+    <div class="pchart-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <div class="pchart-title">📉 現行毛利率排行</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <select id="margin-rank-dir" onchange="renderPortfolioCharts()"
+            style="background:rgba(0,0,0,.4);border:1px solid rgba(255,179,0,.3);
+              color:#FFB300;font-size:12px;font-weight:700;font-family:'Arial',sans-serif;
+              padding:2px 6px;border-radius:3px;cursor:pointer;outline:none;">
+            <option value="top">Top ▲</option>
+            <option value="bottom">Bottom ▼</option>
+          </select>
+          <select id="margin-rank-n" onchange="renderPortfolioCharts()"
+            style="background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.25);
+              color:#00FFFF;font-size:12px;font-weight:700;font-family:'Arial',sans-serif;
+              padding:2px 6px;border-radius:3px;cursor:pointer;outline:none;">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="15">15</option>
+            <option value="20">全部</option>
+          </select>
+        </div>
+      </div>
+      <div class="pchart-sub">由高到低排序 · 紅線 = 8% 警戒線</div>
+      <canvas id="pf-margin-rank" height="180"></canvas>
+    </div>
+
+    <!-- 3. 收款健康度環形 + 統計 -->
+    <div class="pchart-card">
+      <div class="pchart-title">💰 整體財務健康</div>
+      <div class="pchart-sub">風險等級分布 · 收款 vs 完工比例</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <canvas id="pf-rag-donut" width="130" height="130" style="flex-shrink:0;"></canvas>
+        <div id="pf-stats" style="flex:1;"></div>
+      </div>
+    </div>
+  </div><!-- end portfolio-charts-wrap -->
+
+<!-- ── 現金流預測區塊 ── -->
+<div id="cashflow-section" style="background:rgba(8,11,18,.6);border-top:1px solid rgba(0,229,255,.12);border-bottom:1px solid rgba(0,229,255,.12);position:relative;z-index:1;">
+  <!-- 標題列：與 section-hd 同風格 -->
+  <div class="section-hd" id="cashflow-analytics-hd">
+    <h2>💰 未來 90 天資金流預測</h2>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:11px;color:#A8C4D8;display:flex;align-items:center;gap:10px;">
+        <span><span style="display:inline-block;width:18px;height:3px;background:#00E676;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>預計收款</span>
+        <span><span style="display:inline-block;width:18px;height:3px;background:#FF3D3D;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>預計支出</span>
+        <span><span style="display:inline-block;width:18px;height:2px;background:#00E5FF;border-radius:1px;vertical-align:middle;margin-right:4px;"></span>淨現金（累計）</span>
+      </span>
+      <select id="cashflow-proj-filter" onchange="renderCashflowChart()"
+        style="background:rgba(0,0,0,.4);border:1px solid rgba(0,229,255,.25);color:#00FFFF;
+               font-size:12px;font-family:'Arial',sans-serif;padding:3px 8px;border-radius:3px;cursor:pointer;outline:none;">
+        <option value="all">全部專案</option>
+        <option value="R">高風險案</option>
+        <option value="A">注意案</option>
+        <option value="G">正常案</option>
+      </select>
+      <button class="collapse-btn" id="cashflow-toggle-btn" onclick="toggleSection('cashflow-body','cashflow-toggle-btn')">▼ 收合</button>
+    </div>
+  </div>
+  <!-- 圖表本體 -->
+  <div id="cashflow-body" style="padding:10px 24px 8px;">
+    <div style="font-size:11px;color:#8BAAC8;margin-bottom:8px;" id="cashflow-sub">基於請款計畫 × 收款歷史 × 發包支出預測</div>
+    <!-- canvas wrapper：100% 寬由 JS resize 控制 -->
+    <div style="position:relative;height:180px;width:100%;">
+      <canvas id="pf-cashflow" style="position:absolute;top:0;left:0;width:100%;height:100%;"></canvas>
+    </div>
+    <!-- 摘要數字 -->
+    <div id="cashflow-summary" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px;padding-bottom:4px;"></div>
+  </div>
+</div>
+
+
+  <div class="section-hd">
+    <h2>Portfolio Overview — 專案組合</h2>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:14px;color:#A8C4D8;letter-spacing:2px;">CLICK TO VIEW DETAIL</span>
+      <button class="collapse-btn" id="portfolio-list-btn" onclick="toggleSection('portfolio-list-body','portfolio-list-btn')">▼ 收合</button>
+    </div>
+  </div>
+  <div id="portfolio-list-body">
+  <div class="filter-bar">
+    <label>Filter ▸</label>
+    <button class="filter-btn active-all" onclick="setFilter('all',this,'all')">All <span id="cnt-all"></span></button>
+    <button class="filter-btn" onclick="setFilter('R',this,'R')">● Critical <span id="cnt-R"></span></button>
+    <button class="filter-btn" onclick="setFilter('A',this,'A')">● Warning <span id="cnt-A"></span></button>
+    <button class="filter-btn" onclick="setFilter('G',this,'G')">● Normal <span id="cnt-G"></span></button>
+    <input class="search-box" id="searchBox" placeholder="[ SEARCH: 名稱 / PM / 客戶 ]" oninput="renderBoth()">
+    <div style="margin-left:8px;display:flex;align-items:center;gap:4px;
+      background:rgba(0,0,0,.3);border:1px solid rgba(0,229,255,.2);border-radius:4px;padding:3px;">
+      <button id="btn-list"
+        style="padding:5px 14px;border-radius:3px;font-size:13px;font-weight:700;cursor:pointer;
+          border:none;font-family:'Arial',sans-serif;letter-spacing:.5px;
+          background:transparent;color:#8BAAC8;"
+        onclick="switchView('list')">☰ 列表</button>
+      <button id="btn-tile"
+        style="padding:5px 14px;border-radius:3px;font-size:13px;font-weight:700;cursor:pointer;
+          border:none;font-family:'Arial',sans-serif;letter-spacing:.5px;
+          background:rgba(0,229,255,.15);color:#00FFFF;box-shadow:0 0 12px rgba(0,229,255,.35);"
+        onclick="switchView('tile')">⊞ 卡片</button>
+    </div>
+  </div>
+  <div class="table-wrap" id="list-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('rag')" id="th-rag">Status</th>
+          <th onclick="sortBy('id')" id="th-id">Project ID</th>
+          <th onclick="sortBy('name')" id="th-name">專案名稱</th>
+          <th onclick="sortBy('pm')" id="th-pm">PM</th>
+          <th onclick="sortBy('contract')" id="th-contract">合約（M）</th>
+          <th onclick="sortBy('margin_cur')" id="th-margin_cur">現行毛利率</th>
+          <th>進度（成本 / 自評）</th>
+          <th onclick="sortBy('billing_gap')" id="th-billing_gap">收款缺口</th>
+          <th onclick="sortBy('risk')" id="th-risk">風險金</th>
+          <th>警示</th>
+        </tr>
+      </thead>
+      <tbody id="proj-tbody"></tbody>
+    </table>
+  </div>
+  <div class="tile-wrap" id="tile-wrap">
+    <div class="tile-grid" id="proj-tiles"></div>
+  </div>
+  </div><!-- end portfolio-list-body -->
+  <!-- portfolio footer -->
+  <div style="background:rgba(8,11,18,.95);border-top:1px solid rgba(0,229,255,.12);
+    font-size:13px;padding:10px 24px;letter-spacing:1px;
+    display:flex;justify-content:space-between;align-items:center;color:#8BAAC8;
+    position:relative;z-index:1;margin-top:auto;">
+    <span><span style="color:var(--cyan);font-weight:700;">CTCI ASI</span> · 專案執行戰情室 · Project War Room</span>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <img src="sap_logo.png" alt="SAP" style="height:16px;border-radius:2px;opacity:.75;">
+      <span>Powered by SAP Business Data Cloud</span>
+    </div>
+    <span>Copyright © 2026 CTCI Advanced Systems Inc. All rights reserved.</span>
+  </div>
+</div><!-- end view-portfolio -->
+
+<!-- ═══════════════════════════════════════════
+     DETAIL VIEW
+═══════════════════════════════════════════ -->
+
+<!-- ── 浮動錨點導航 ── -->
+<div id="detail-float-nav">
+  <div class="float-nav-title">快速導航</div>
+  <button class="float-nav-btn" onclick="navTo('d-kpi-section')">
+    <span class="nav-icon">📌</span><span class="nav-label">KPI 總覽</span>
+  </button>
+  <button class="float-nav-btn" onclick="navTo('row1-section')">
+    <span class="nav-icon">🔬</span><span class="nav-label">健康雷達</span>
+  </button>
+  <button class="float-nav-btn" onclick="navTo('row2-section')">
+    <span class="nav-icon">📈</span><span class="nav-label">財務趨勢</span>
+  </button>
+  <button class="float-nav-btn" onclick="navTo('row3-section')">
+    <span class="nav-icon">⚙</span><span class="nav-label">執行細節</span>
+  </button>
+  <div class="float-nav-divider"></div>
+  <button class="float-nav-btn" onclick="navTo('cost-drill-section')">
+    <span class="nav-icon">📦</span><span class="nav-label">成本下鑽</span>
+  </button>
+  <button class="float-nav-btn" onclick="navTo('diag-section')">
+    <span class="nav-icon">🔍</span><span class="nav-label">自動診斷</span>
+  </button>
+  <button class="float-nav-btn" onclick="navTo('pm-section')">
+    <span class="nav-icon">💬</span><span class="nav-label">PM 說明</span>
+  </button>
+</div>
+
+<div id="view-detail">
+  <div class="detail-hero">
+    <img id="d-hero-img" class="detail-hero-img" src="" alt="">
+    <div class="detail-scan"></div>
+    <div style="position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;">
+      <div>
+        <div class="detail-rag" id="d-rag-badge"></div>
+        <div class="detail-proj-name" id="d-proj-name"></div>
+        <div class="detail-meta" id="d-proj-meta"></div>
+      </div>
+      <button onclick="openReportModal()" style="
+        display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:20px;margin-top:4px;
+        background:linear-gradient(135deg,#FF3621,#FF8C00);
+        color:#fff;border:none;cursor:pointer;
+        padding:10px 20px;border-radius:4px;font-size:14px;font-weight:700;
+        font-family:'Arial',sans-serif;letter-spacing:.5px;
+        box-shadow:0 0 20px rgba(255,54,33,.5);transition:all .2s;
+        white-space:nowrap;">
+        📋 AI 健康報告
+      </button>
+    </div>
+  </div>
+  <div id="d-kpi-section" style="scroll-margin-top:80px;"></div>
+  <div class="dkpi-grid" id="d-kpi-grid"></div>
+  <div id="row1-section" style="scroll-margin-top:80px;"></div>
+  <!-- ── ROW 1: 健康雷達 + 甘特圖 ── -->
+  <div class="detail-section" style="padding-top:20px;">
+    <div class="section-label" onclick="toggleSection('row1-body','row1-btn')">
+      <span>▶ 專案健康雷達 &amp; 時程甘特</span>
+      <button class="collapse-btn" id="row1-btn">▼ 收合</button>
+    </div>
+  <div id="row1-body">
+    <div class="adv-grid-wide">
+
+      <!-- 雷達圖 + 健康分數 -->
+      <div class="chart-card">
+        <div class="chart-card-title">🔬 六維健康雷達</div>
+        <div class="chart-card-sub">毛利 / 進度 / 收款 / 風險 / 工時 / 發包 — 滿分 100</div>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          <div style="flex:0 0 220px;">
+            <canvas id="d-radar-chart" width="220" height="220"></canvas>
+          </div>
+          <div class="health-score-wrap" style="flex:1;min-width:140px;">
+            <div class="health-score-num" id="d-health-score">--</div>
+            <div class="health-score-lbl" id="d-health-label">計算中</div>
+            <div class="health-dims" id="d-health-dims"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 甘特圖 -->
+      <div class="chart-card">
+        <div class="chart-card-title">📅 工程甘特圖 — 主要里程碑</div>
+        <div class="chart-card-sub">計畫 vs 實際進度 · 白線 = 今日</div>
+        <div class="gantt-wrap" id="d-gantt"></div>
+        <div class="gantt-legend">
+          <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:rgba(0,229,255,.6)"></div>計畫範圍</div>
+          <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:#00E676"></div>已完成</div>
+          <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:#FF5722"></div>進行中（落後）</div>
+          <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:#FFB300"></div>進行中（注意）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- end row1-body -->
+  <div id="row2-section" style="scroll-margin-top:80px;"></div>
+  <!-- ── ROW 2: EAC 趨勢 + 收款瀑布 + 毛利區間 ── -->
+  <div class="detail-section">
+    <div class="section-label" onclick="toggleSection('row2-body','row2-btn')">
+      <span>▶ 財務趨勢 &amp; 預測</span>
+      <button class="collapse-btn" id="row2-btn">▼ 收合</button>
+    </div>
+  <div id="row2-body">
+    <div class="adv-grid">
+
+      <!-- EAC 趨勢折線圖 -->
+      <div class="chart-card">
+        <div class="chart-card-title">📈 EAC 趨勢 vs 合約金額</div>
+        <div class="chart-card-sub">月度 EAC 變化 · 紅線 = 合約上限</div>
+        <div id="d-eac-warn" class="eac-warn-zone" style="display:none">
+          ⚠ EAC 已超越合約金額，損益轉負風險
+        </div>
+        <canvas id="d-eac-chart" height="200"></canvas>
+      </div>
+
+      <!-- 收款瀑布圖 -->
+      <div class="chart-card">
+        <div class="chart-card-title">💧 收款瀑布分析</div>
+        <div class="chart-card-sub">合約金額拆解 · 單位：M TWD</div>
+        <canvas id="d-waterfall-chart" height="200"></canvas>
+      </div>
+
+      <!-- 完工毛利率情境 -->
+      <div class="chart-card">
+        <div class="chart-card-title">🎯 完工毛利率情境預測</div>
+        <div class="chart-card-sub">樂觀 / 基準 / 悲觀三情境</div>
+        <canvas id="d-scenario-chart" height="200"></canvas>
+        <div id="d-scenario-desc" style="margin-top:10px;font-size:12px;color:#A8C4D8;line-height:1.7;"></div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- end row2-body -->
+  <div id="row3-section" style="scroll-margin-top:80px;"></div>
+  <!-- ── ROW 3: 原有圖表 ── -->
+  <div class="detail-section">
+    <div class="section-label" onclick="toggleSection('row3-body','row3-btn')">
+      <span>▶ 執行細節</span>
+      <button class="collapse-btn" id="row3-btn">▼ 收合</button>
+    </div>
+  <div id="row3-body">
+    <div class="chart-grid-2" style="margin-bottom:12px;">
+      <div class="chart-card">
+        <div class="chart-card-title">四軸進度對比</div>
+        <div class="chart-card-sub">工期 / 成本 / 自評 / 完工比例</div>
+        <div id="d-progress-bars"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">金額結構</div>
+        <div class="chart-card-sub">合約 / EAC / 累計認列（M TWD）</div>
+        <canvas id="d-amount-chart" height="200"></canvas>
+      </div>
+    </div>
+    <div class="chart-grid-3">
+      <div class="chart-card">
+        <div class="chart-card-title">毛利率比較</div>
+        <div class="chart-card-sub">成案 vs 現行 vs 會計</div>
+        <canvas id="d-margin-chart" height="200"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">工時 / 材料 / 發包</div>
+        <div class="chart-card-sub">Budget vs Actual</div>
+        <canvas id="d-mh-chart" height="200"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">Alert Summary</div>
+        <div class="chart-card-sub">需 CEO 關注項目</div>
+        <div id="d-alert-table"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="cost-drill-section" style="scroll-margin-top:80px;"></div>
+  <!-- ── 成本下鑽 ── -->
+  <div class="detail-section">
+    <div class="section-label" onclick="toggleSection('cost-drill-body','cost-drill-btn')">
+      <span>📊 成本下鑽 — 直接成本 & 間接成本明細</span>
+      <button class="collapse-btn" id="cost-drill-btn">▼ 收合</button>
+    </div>
+    <div id="cost-drill-body">
+      <div class="cost-summary-row" id="d-cost-summary-chips"></div>
+      <div class="cost-drill-grid" id="d-cost-drill-grid"></div>
+      <div class="indirect-section" id="d-indirect-section"></div>
+    </div>
+  </div>
+
+  <div id="diag-section" style="scroll-margin-top:80px;"></div>
+  <!-- ── 自動診斷面板 ── -->
+  <div class="detail-section" style="padding-bottom:24px;">
+    <div class="section-label" onclick="toggleSection('diag-body','diag-btn')">
+      <span>🔍 自動診斷 — 異常偵測與分析</span>
+      <button class="collapse-btn" id="diag-btn">▼ 收合</button>
+    </div>
+    <div id="diag-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;" id="d-diag-grid"></div>
+    </div>
+  </div>
+
+
+  <div id="pm-section" style="scroll-margin-top:80px;"></div>
+  <!-- ── PM 說明機制 ── -->
+  <div class="detail-section" style="padding-bottom:28px;">
+    <div class="section-label" onclick="toggleSection('pm-comment-body','pm-comment-btn')">
+      <span>💬 PM 說明區 — 異常項目說明與紀錄</span>
+      <button class="collapse-btn" id="pm-comment-btn">▼ 收合</button>
+    </div>
+    <div id="pm-comment-body">
+      <div id="d-pm-triggers"></div>
+      <div class="pm-export-bar">
+        <button class="pm-export-btn" onclick="exportComments()">↓ 匯出所有說明（JSON）</button>
+        <label class="pm-import-label">
+          ↑ 匯入說明紀錄
+          <input type="file" accept=".json" style="display:none" onchange="importComments(event)">
+        </label>
+        <span style="font-size:10px;color:#8BAAC8;margin-left:auto;align-self:center;">
+          說明紀錄儲存於本機 localStorage，可匯出 JSON 跨裝置使用
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ── AI 健康報告 MODAL ── -->
+<div id="report-modal-overlay" onclick="closeReportModal()" style="
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);z-index:800;backdrop-filter:blur(4px);"></div>
+
+<div id="report-modal" style="
+  display:none;position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:min(880px,96vw);max-height:90vh;
+  background:#0d1117;border:1px solid rgba(255,87,34,.35);
+  border-radius:8px;z-index:900;
+  box-shadow:0 0 60px rgba(255,54,33,.3),0 0 120px rgba(0,0,0,.8);
+  display:none;flex-direction:column;overflow:hidden;">
+
+  <!-- Modal Header -->
+  <div style="
+    background:linear-gradient(135deg,rgba(255,54,33,.2),rgba(255,140,0,.1));
+    border-bottom:1px solid rgba(255,87,34,.25);
+    padding:16px 22px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="width:40px;height:40px;border-radius:8px;
+        background:linear-gradient(135deg,#FF3621,#FF8C00);
+        display:flex;align-items:center;justify-content:center;font-size:20px;
+        box-shadow:0 0 16px rgba(255,54,33,.5);">📋</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#fff;font-family:'Arial',sans-serif;">AI 專案健康報告</div>
+        <div style="font-size:13px;color:#FF8A50;letter-spacing:.5px;font-family:'Arial',sans-serif;" id="modal-proj-title">選擇專案後生成</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="report-gen-btn" onclick="generateHealthReport()" style="
+        display:flex;align-items:center;gap:6px;
+        background:linear-gradient(135deg,#FF3621,#FF8C00);
+        color:#fff;border:none;cursor:pointer;
+        padding:8px 20px;border-radius:4px;font-size:14px;font-weight:700;
+        font-family:'Arial',sans-serif;box-shadow:0 0 16px rgba(255,54,33,.4);">
+        ✦ 一鍵生成
+      </button>
+      <button onclick="closeReportModal()" style="
+        width:32px;height:32px;border-radius:4px;cursor:pointer;
+        background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
+        color:#8BAAC8;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+  </div>
+
+  <!-- 流程步驟 -->
+  <div style="padding:12px 22px;border-bottom:1px solid var(--border);flex-shrink:0;">
+    <div class="report-flow" id="report-flow" style="margin-bottom:0;">
+      <div class="report-flow-step" id="flow-1"><span class="step-icon">📥</span>收集數據</div>
+      <div class="report-flow-step" id="flow-2"><span class="step-icon">🔍</span>檢討分析</div>
+      <div class="report-flow-step" id="flow-3"><span class="step-icon">💡</span>找出原因</div>
+      <div class="report-flow-step" id="flow-4"><span class="step-icon">📝</span>行動方案</div>
+      <div class="report-flow-step" id="flow-5"><span class="step-icon">📄</span>產生報告</div>
+      <div class="report-flow-step" id="flow-6"><span class="step-icon">🔔</span>持續追蹤</div>
+    </div>
+  </div>
+
+  <!-- 報告內容（可捲動）-->
+  <div style="flex:1;overflow-y:auto;padding:18px 22px 22px;">
+    <div class="report-output" id="report-output">
+      <div class="report-grid">
+        <div class="report-block">
+          <div class="report-block-title" style="color:#00FFFF;">📋 專案狀況摘要</div>
+          <div class="report-block-body" id="rb-summary-body"></div>
+        </div>
+        <div class="report-block">
+          <div class="report-block-title" style="color:#FF3D3D;">⚠ 異常偏差分析</div>
+          <div class="report-block-body" id="rb-deviation-body"></div>
+        </div>
+        <div class="report-block">
+          <div class="report-block-title" style="color:#FFB300;">🔍 根因分析</div>
+          <div class="report-block-body" id="rb-rootcause-body"></div>
+        </div>
+        <div class="report-block">
+          <div class="report-block-title" style="color:#FF8A50;">🔔 預警通知</div>
+          <div class="report-block-body" id="rb-warning-body"></div>
+        </div>
+      </div>
+      <div class="report-block" style="margin-bottom:14px;">
+        <div class="report-block-title" style="color:#00E676;">✅ AI 建議行動方案</div>
+        <div class="action-list" id="rb-actions"></div>
+      </div>
+      <div class="report-block" style="margin-bottom:14px;">
+        <div class="report-block-title" style="color:#00FFFF;">📈 持續追蹤 — 下月目標</div>
+        <div class="report-track" id="rb-track"></div>
+      </div>
+      <div class="report-actions">
+        <button class="report-export-btn" onclick="exportReportTxt()">↓ 匯出 TXT</button>
+        <button class="report-export-btn" onclick="copyReport()">⎘ 複製報告</button>
+        <button class="report-export-btn" onclick="generateHealthReport()">↻ 重新生成</button>
+        <span class="report-timestamp" id="report-timestamp"></span>
+      </div>
+    </div>
+    <!-- 未生成時的提示 -->
+    <div id="report-placeholder" style="text-align:center;padding:50px 20px;color:#8BAAC8;">
+      <div style="font-size:48px;margin-bottom:16px;">📋</div>
+      <div style="font-size:16px;font-weight:700;color:#C8DDEF;margin-bottom:8px;">點擊「✦ 一鍵生成」開始</div>
+      <div style="font-size:13px;line-height:1.8;">
+        AI 將自動分析 POMS + SAP ERP 數據<br>
+        產生標準化專案健康報告備註
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-footer">
+  <span><span class="footer-brand">CTCI ASI</span> · 專案執行戰情室 · Project War Room</span>
+  <div class="sap-footer-badge">
+    <img src="sap_logo.png" alt="SAP">
+    <span>Powered by SAP Business Data Cloud</span>
+  </div>
+  <span>Copyright © 2026 CTCI Advanced Systems Inc. All rights reserved.</span>
+</div>
+
+<script src="chart.umd.min.js"></script>
+<script>
+/* ── CLOCK ───────────────────────────────────── */
+let currentView = 'tile'; // must be declared before any renderBoth() calls
+function updateClock(){
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    n.toLocaleTimeString('zh-TW',{hour12:false});
+}
+setInterval(updateClock,1000); updateClock();
+
+/* ── DATASET ─────────────────────────────────── */
+const PROJECTS = [
+  {id:'22 5000D',name:'中油大林 P8 儀控 EPC',pm:'魏立廉',dept:'工程專案部',cse:'曾靖雯',client:'中鼎工程/台灣中油',start:'2022/08',end:'2028/01',contract:233.7,contract_budget:192.9,eac_bcms:221.7,eac_acc:212.0,margin_base:10.88,margin_cur:7.82,margin_acc:9.28,schedule_pct:69.7,cost_pct:68.3,self_pct:65.6,complete_pct:61.9,billed_pct:48.5,billing_gap:-7.1,risk_base:120,risk_cur:2241,mh_budget:16094,mh_plan:21755,mh_actual:15610,mat_budget:41.97,mat_actual:39.60,sub_budget:130.76,sub_actual:71.77,revenue_acc:144.5,cost_acc:131.9,profit_acc:13.4,alerts:['發包落後 4,662 萬','收款落後完工 13.4pp','SE&C 膨脹 18.7×'],rag:'A'},
+  {id:'21 3200A',name:'台電大甲 CEMS 擴充',pm:'林志遠',dept:'工程專案部',cse:'陳怡君',client:'台灣電力公司',start:'2021/03',end:'2026/09',contract:87.4,contract_budget:74.2,eac_bcms:88.1,eac_acc:87.6,margin_base:14.2,margin_cur:5.1,margin_acc:6.8,schedule_pct:88.2,cost_pct:94.1,self_pct:86.3,complete_pct:89.5,billed_pct:78.2,billing_gap:-12.3,risk_base:210,risk_cur:5840,mh_budget:8200,mh_plan:11400,mh_actual:9870,mat_budget:18.5,mat_actual:17.2,sub_budget:42.1,sub_actual:38.4,revenue_acc:78.3,cost_acc:73.1,profit_acc:5.2,alerts:['毛利嚴重下滑 −9.1pp','成本超控','風險準備金 27.8×'],rag:'R'},
+  {id:'23 1800C',name:'台塑六輕 DCS 更新',pm:'王建明',dept:'系統整合部',cse:'劉美華',client:'台塑石化',start:'2023/01',end:'2027/06',contract:156.2,contract_budget:134.8,eac_bcms:148.3,eac_acc:150.1,margin_base:13.6,margin_cur:9.7,margin_acc:10.2,schedule_pct:45.3,cost_pct:43.8,self_pct:44.1,complete_pct:42.5,billed_pct:38.6,billing_gap:-3.9,risk_base:380,risk_cur:1240,mh_budget:14600,mh_plan:18200,mh_actual:7820,mat_budget:62.4,mat_actual:28.1,sub_budget:58.7,sub_actual:24.3,revenue_acc:66.3,cost_acc:59.8,profit_acc:6.5,alerts:['進度稍落後'],rag:'G'},
+  {id:'22 4100B',name:'中油桃園 SIS 汰換',pm:'陳俊宏',dept:'工程專案部',cse:'張雅婷',client:'台灣中油',start:'2022/06',end:'2026/12',contract:64.8,contract_budget:55.3,eac_bcms:66.9,eac_acc:65.4,margin_base:14.6,margin_cur:8.3,margin_acc:9.4,schedule_pct:81.7,cost_pct:89.4,self_pct:82.1,complete_pct:85.3,billed_pct:74.2,billing_gap:-11.1,risk_base:175,risk_cur:3210,mh_budget:6800,mh_plan:8900,mh_actual:6940,mat_budget:14.2,mat_actual:13.8,sub_budget:32.6,sub_actual:28.4,revenue_acc:55.7,cost_acc:51.3,profit_acc:4.4,alerts:['毛利下滑 −6.3pp','成本超控'],rag:'R'},
+  {id:'24 0600A',name:'台灣高鐵 ATP 儀控整合',pm:'黃淑芬',dept:'交通系統部',cse:'吳柏辰',client:'台灣高鐵',start:'2024/02',end:'2027/11',contract:198.5,contract_budget:171.4,eac_bcms:190.2,eac_acc:188.7,margin_base:13.7,margin_cur:11.2,margin_acc:12.1,schedule_pct:28.4,cost_pct:26.8,self_pct:27.3,complete_pct:25.9,billed_pct:22.4,billing_gap:-3.5,risk_base:520,risk_cur:980,mh_budget:18900,mh_plan:24100,mh_actual:5240,mat_budget:78.3,mat_actual:21.4,sub_budget:74.2,sub_actual:20.1,revenue_acc:51.4,cost_acc:45.7,profit_acc:5.7,alerts:['進度正常'],rag:'G'},
+  {id:'21 5500D',name:'台積電 N3 廠 E&I',pm:'鄭文傑',dept:'工程專案部',cse:'許雅慧',client:'台積電',start:'2021/10',end:'2026/06',contract:412.3,contract_budget:358.1,eac_bcms:438.7,eac_acc:442.1,margin_base:12.8,margin_cur:4.2,margin_acc:5.1,schedule_pct:97.8,cost_pct:103.2,self_pct:96.1,complete_pct:98.7,billed_pct:91.3,billing_gap:-7.4,risk_base:890,risk_cur:18640,mh_budget:38400,mh_plan:48200,mh_actual:41800,mat_budget:142.6,mat_actual:149.3,sub_budget:186.4,sub_actual:192.8,revenue_acc:407.1,cost_acc:381.4,profit_acc:25.7,alerts:['EAC 超合約！損益轉負','成本>100%','風險金 20.9×'],rag:'R'},
+  {id:'23 2900B',name:'台電核三廠儀控維護',pm:'楊承翰',dept:'維護服務部',cse:'蔡佩君',client:'台灣電力公司',start:'2023/07',end:'2027/03',contract:43.6,contract_budget:37.8,eac_bcms:41.2,eac_acc:41.8,margin_base:13.3,margin_cur:10.8,margin_acc:11.4,schedule_pct:52.6,cost_pct:50.3,self_pct:51.2,complete_pct:49.8,billed_pct:46.2,billing_gap:-3.6,risk_base:95,risk_cur:280,mh_budget:4200,mh_plan:5100,mh_actual:2340,mat_budget:8.4,mat_actual:4.2,sub_budget:22.1,sub_actual:11.3,revenue_acc:21.7,cost_acc:19.4,profit_acc:2.3,alerts:['整體執行正常'],rag:'G'},
+  {id:'24 1100A',name:'桃園機場 BHS 自動化',pm:'林俊豪',dept:'交通系統部',cse:'曾怡萱',client:'桃園國際機場',start:'2024/05',end:'2028/04',contract:127.4,contract_budget:109.6,eac_bcms:122.8,eac_acc:121.3,margin_base:13.9,margin_cur:10.6,margin_acc:11.3,schedule_pct:18.7,cost_pct:17.4,self_pct:18.1,complete_pct:16.8,billed_pct:14.3,billing_gap:-2.5,risk_base:310,risk_cur:640,mh_budget:11800,mh_plan:15200,mh_actual:2180,mat_budget:48.6,mat_actual:8.4,sub_budget:52.4,sub_actual:9.2,revenue_acc:20.4,cost_acc:18.2,profit_acc:2.2,alerts:['初期進度正常'],rag:'G'},
+  {id:'22 6700C',name:'中海油氣田 SCADA',pm:'吳志明',dept:'工程專案部',cse:'洪雅惠',client:'中海油',start:'2022/11',end:'2027/08',contract:89.3,contract_budget:76.4,eac_bcms:91.8,eac_acc:93.2,margin_base:14.4,margin_cur:6.7,margin_acc:7.8,schedule_pct:63.4,cost_pct:71.2,self_pct:64.8,complete_pct:68.9,billed_pct:52.1,billing_gap:-16.8,risk_base:220,risk_cur:4180,mh_budget:8700,mh_plan:11300,mh_actual:7260,mat_budget:22.4,mat_actual:19.8,sub_budget:44.2,sub_actual:31.6,revenue_acc:61.5,cost_acc:57.4,profit_acc:4.1,alerts:['成本超自評 6.4pp','收款落後 16.8pp'],rag:'R'},
+  {id:'23 3400A',name:'長春石化 APC 導入',pm:'許智傑',dept:'系統整合部',cse:'余宜臻',client:'長春石化',start:'2023/03',end:'2026/10',contract:31.8,contract_budget:27.4,eac_bcms:30.6,eac_acc:31.1,margin_base:13.8,margin_cur:10.7,margin_acc:11.2,schedule_pct:84.6,cost_pct:83.1,self_pct:82.4,complete_pct:81.9,billed_pct:76.3,billing_gap:-5.6,risk_base:82,risk_cur:310,mh_budget:3100,mh_plan:3800,mh_actual:2840,mat_budget:6.4,mat_actual:5.9,sub_budget:15.2,sub_actual:13.7,revenue_acc:26.1,cost_acc:23.4,profit_acc:2.7,alerts:['執行良好'],rag:'G'},
+  {id:'24 2200B',name:'台化麥寮 MES 整合',pm:'蔡宗憲',dept:'系統整合部',cse:'林明珠',client:'台化公司',start:'2024/01',end:'2027/09',contract:74.6,contract_budget:64.1,eac_bcms:71.4,eac_acc:72.8,margin_base:14.1,margin_cur:11.8,margin_acc:12.4,schedule_pct:31.2,cost_pct:29.8,self_pct:30.4,complete_pct:28.7,billed_pct:26.1,billing_gap:-2.6,risk_base:190,risk_cur:420,mh_budget:7200,mh_plan:9100,mh_actual:2160,mat_budget:28.4,mat_actual:8.6,sub_budget:30.2,sub_actual:9.1,revenue_acc:21.4,cost_acc:19.1,profit_acc:2.3,alerts:['初期良好'],rag:'G'},
+  {id:'21 4800B',name:'台電興達電廠 DCS 更新',pm:'張哲維',dept:'工程專案部',cse:'劉芸瑄',client:'台灣電力公司',start:'2021/05',end:'2026/08',contract:102.4,contract_budget:87.6,eac_bcms:108.9,eac_acc:110.2,margin_base:14.5,margin_cur:5.8,margin_acc:6.4,schedule_pct:94.3,cost_pct:98.7,self_pct:91.2,complete_pct:95.4,billed_pct:88.1,billing_gap:-7.3,risk_base:265,risk_cur:6840,mh_budget:9400,mh_plan:12800,mh_actual:9830,mat_budget:24.3,mat_actual:24.8,sub_budget:52.6,sub_actual:54.2,revenue_acc:97.7,cost_acc:91.8,profit_acc:5.9,alerts:['EAC 超合約','成本超控'],rag:'R'},
+  {id:'23 0900C',name:'中美和 SCADA 整合',pm:'郭宇軒',dept:'系統整合部',cse:'謝宜庭',client:'中美和石化',start:'2023/09',end:'2027/04',contract:48.2,contract_budget:41.3,eac_bcms:46.1,eac_acc:46.8,margin_base:14.3,margin_cur:10.2,margin_acc:11.1,schedule_pct:41.8,cost_pct:40.2,self_pct:41.3,complete_pct:39.8,billed_pct:36.4,billing_gap:-3.4,risk_base:124,risk_cur:380,mh_budget:4600,mh_plan:5800,mh_actual:1920,mat_budget:10.2,mat_actual:3.8,sub_budget:24.1,sub_actual:9.6,revenue_acc:19.1,cost_acc:17.1,profit_acc:2.0,alerts:['進度略低'],rag:'A'},
+  {id:'24 3100A',name:'北捷信義線通訊整合',pm:'方淑惠',dept:'交通系統部',cse:'游政宏',client:'台北捷運公司',start:'2024/06',end:'2028/12',contract:218.6,contract_budget:188.4,eac_bcms:209.3,eac_acc:208.1,margin_base:13.2,margin_cur:11.8,margin_acc:12.3,schedule_pct:14.2,cost_pct:12.8,self_pct:13.6,complete_pct:12.1,billed_pct:10.8,billing_gap:-1.3,risk_base:580,risk_cur:890,mh_budget:21400,mh_plan:27600,mh_actual:3180,mat_budget:84.2,mat_actual:10.4,sub_budget:88.6,sub_actual:10.8,revenue_acc:25.1,cost_acc:22.4,profit_acc:2.7,alerts:['初期正常'],rag:'G'},
+  {id:'22 7200D',name:'亞東石化 SIS 驗證',pm:'陳文龍',dept:'工程專案部',cse:'李佳穎',client:'亞東石化',start:'2022/09',end:'2026/11',contract:52.1,contract_budget:44.6,eac_bcms:54.8,eac_acc:55.3,margin_base:14.4,margin_cur:7.4,margin_acc:8.1,schedule_pct:79.6,cost_pct:86.3,self_pct:79.1,complete_pct:83.4,billed_pct:71.2,billing_gap:-12.2,risk_base:142,risk_cur:3620,mh_budget:5100,mh_plan:6700,mh_actual:4890,mat_budget:11.6,mat_actual:11.2,sub_budget:26.4,sub_actual:22.8,revenue_acc:44.8,cost_acc:41.3,profit_acc:3.5,alerts:['毛利下滑','收款落後 12pp'],rag:'R'},
+  {id:'23 5600B',name:'李長榮 FEED 儀控設計',pm:'楊政益',dept:'工程設計部',cse:'施怡婷',client:'李長榮化工',start:'2023/11',end:'2026/09',contract:28.4,contract_budget:24.3,eac_bcms:27.1,eac_acc:27.6,margin_base:14.4,margin_cur:11.3,margin_acc:12.1,schedule_pct:71.4,cost_pct:69.8,self_pct:70.4,complete_pct:68.9,billed_pct:65.2,billing_gap:-3.7,risk_base:74,risk_cur:210,mh_budget:2800,mh_plan:3400,mh_actual:2180,mat_budget:4.8,mat_actual:3.4,sub_budget:14.2,sub_actual:10.8,revenue_acc:19.6,cost_acc:17.4,profit_acc:2.2,alerts:['指標健康'],rag:'G'},
+  {id:'24 4800C',name:'PTTAC 石化儀控 EPC',pm:'黃志偉',dept:'工程專案部',cse:'林依潔',client:'PTTAC 泰國',start:'2024/03',end:'2028/06',contract:184.7,contract_budget:158.9,eac_bcms:177.4,eac_acc:176.8,margin_base:14.0,margin_cur:12.1,margin_acc:12.8,schedule_pct:22.6,cost_pct:21.3,self_pct:22.1,complete_pct:20.8,billed_pct:18.4,billing_gap:-2.4,risk_base:490,risk_cur:720,mh_budget:17400,mh_plan:22100,mh_actual:3840,mat_budget:68.4,mat_actual:14.8,sub_budget:74.8,sub_actual:16.2,revenue_acc:36.8,cost_acc:32.7,profit_acc:4.1,alerts:['初期良好'],rag:'G'},
+  {id:'22 8400A',name:'翔鷺石化 DCS 統包',pm:'吳家豪',dept:'工程專案部',cse:'陳芸蓁',client:'翔鷺石化',start:'2022/04',end:'2027/02',contract:138.6,contract_budget:118.4,eac_bcms:142.3,eac_acc:144.1,margin_base:13.5,margin_cur:8.2,margin_acc:9.1,schedule_pct:75.2,cost_pct:80.4,self_pct:74.6,complete_pct:77.8,billed_pct:62.4,billing_gap:-15.4,risk_base:360,risk_cur:4980,mh_budget:12800,mh_plan:16600,mh_actual:11340,mat_budget:48.2,mat_actual:43.1,sub_budget:62.4,sub_actual:50.3,revenue_acc:107.8,cost_acc:99.4,profit_acc:8.4,alerts:['成本超控','收款落後 15pp'],rag:'R'},
+  {id:'23 7100B',name:'中油大林儀控維護',pm:'魏立廉',dept:'維護服務部',cse:'曾靖雯',client:'台灣中油',start:'2023/08',end:'2026/12',contract:18.4,contract_budget:15.8,eac_bcms:17.6,eac_acc:17.9,margin_base:14.1,margin_cur:12.4,margin_acc:13.1,schedule_pct:78.4,cost_pct:76.8,self_pct:77.2,complete_pct:75.6,billed_pct:72.4,billing_gap:-3.2,risk_base:48,risk_cur:140,mh_budget:1800,mh_plan:2200,mh_actual:1540,mat_budget:2.4,mat_actual:2.1,sub_budget:10.8,sub_actual:9.4,revenue_acc:13.9,cost_acc:12.4,profit_acc:1.5,alerts:['執行良好'],rag:'G'},
+  {id:'24 5200D',name:'國巨高雄廠 E&I 整合',pm:'林昱辰',dept:'工程專案部',cse:'莊佳儀',client:'國巨股份有限公司',start:'2024/08',end:'2027/07',contract:92.4,contract_budget:79.3,eac_bcms:88.6,eac_acc:87.4,margin_base:14.2,margin_cur:12.6,margin_acc:13.2,schedule_pct:11.4,cost_pct:10.2,self_pct:10.8,complete_pct:9.8,billed_pct:8.4,billing_gap:-1.4,risk_base:240,risk_cur:360,mh_budget:8600,mh_plan:11200,mh_actual:960,mat_budget:32.6,mat_actual:3.4,sub_budget:38.4,sub_actual:4.1,revenue_acc:9.1,cost_acc:8.1,profit_acc:1.0,alerts:['初期良好'],rag:'G'},
+];
+
+const PROJ_HERO_MAP = {
+  'img/petrochemical_thumb.jpg': 'img/petrochemical_hero.jpg',
+  'img/powerplant_thumb.jpg': 'img/powerplant_hero.jpg',
+  'img/pipe_plant_thumb.jpg': 'img/pipe_plant_hero.jpg',
+  'img/oil_tank_thumb.jpg': 'img/oil_tank_hero.jpg',
+  'img/railway_thumb.jpg': 'img/railway_hero.jpg',
+  'img/semiconductor_thumb.jpg': 'img/semiconductor_hero.jpg',
+  'img/factory_thumb.jpg': 'img/factory_hero.jpg',
+  'img/airport_thumb.jpg': 'img/airport_hero.jpg',
+  'img/metro_thumb.jpg': 'img/metro_hero.jpg',
+};
+const PROJ_PHOTOS = {
+  '22 5000D': 'img/petrochemical_thumb.jpg',
+  '21 3200A': 'img/powerplant_thumb.jpg',
+  '23 1800C': 'img/pipe_plant_thumb.jpg',
+  '22 4100B': 'img/oil_tank_thumb.jpg',
+  '24 0600A': 'img/railway_thumb.jpg',
+  '21 5500D': 'img/semiconductor_thumb.jpg',
+  '23 2900B': 'img/powerplant_thumb.jpg',
+  '24 1100A': 'img/airport_thumb.jpg',
+  '22 6700C': 'img/petrochemical_thumb.jpg',
+  '23 3400A': 'img/pipe_plant_thumb.jpg',
+  '24 2200B': 'img/factory_thumb.jpg',
+  '21 4800B': 'img/powerplant_thumb.jpg',
+  '23 0900C': 'img/pipe_plant_thumb.jpg',
+  '24 3100A': 'img/metro_thumb.jpg',
+  '22 7200D': 'img/oil_tank_thumb.jpg',
+  '23 5600B': 'img/petrochemical_thumb.jpg',
+  '24 4800C': 'img/oil_tank_thumb.jpg',
+  '22 8400A': 'img/pipe_plant_thumb.jpg',
+  '23 7100B': 'img/petrochemical_thumb.jpg',
+  '24 5200D': 'img/semiconductor_thumb.jpg',
+};
+
+/* ── CHART CONFIG ────────────────────────────── */
+const C={orange:'#FF5722',cyan:'#00E5FF',blue:'#1E90FF',amber:'#FFB300',
+  red:'#FF3D3D',green:'#00E676',purple:'#CE93D8',gray:'#4A6080',border:'rgba(0,229,255,.12)'};
+Chart.defaults.color='#4A6080';
+Chart.defaults.borderColor='rgba(0,229,255,.1)';
+Chart.defaults.font.family="'Arial',sans-serif";
+
+let activeFilter='all',sortKey='rag',sortAsc=true,detailCharts={};
+const ragOrder=r=>r==='R'?0:r==='A'?1:2;
+const pct=n=>n.toFixed(1)+'%';
+const colorHex={red:'#FF3D3D',amber:'#FFB300',green:'#00E676',cyan:'#00E5FF'};
+
+/* ── SUMMARY ─────────────────────────────────── */
+function renderSummary(){
+  const total=PROJECTS.reduce((s,p)=>s+p.contract,0);
+  const profit=PROJECTS.reduce((s,p)=>s+p.profit_acc,0);
+  const revenue=PROJECTS.reduce((s,p)=>s+p.revenue_acc,0);
+  const mavg=PROJECTS.reduce((s,p)=>s+p.margin_cur,0)/PROJECTS.length;
+  const cR=PROJECTS.filter(p=>p.rag==='R').length;
+  const cA=PROJECTS.filter(p=>p.rag==='A').length;
+  document.getElementById('summary-strip').innerHTML=`
+    <div class="sum-card"><div class="sum-label">Active Projects</div>
+      <div class="sum-value c">${PROJECTS.length}</div><div class="sum-sub">執行中合約</div></div>
+    <div class="sum-card"><div class="sum-label">合約總金額</div>
+      <div class="sum-value">${(total/1000).toFixed(1)}<span style="font-size:16px"> 億</span></div><div class="sum-sub">TWD</div></div>
+    <div class="sum-card"><div class="sum-label">累計認列營收</div>
+      <div class="sum-value c">${(revenue/100).toFixed(1)}<span style="font-size:16px"> 億</span></div><div class="sum-sub">ACC577</div></div>
+    <div class="sum-card"><div class="sum-label">平均現行毛利率</div>
+      <div class="sum-value ${mavg<8?'r':mavg<11?'a':'g'}">${mavg.toFixed(1)}%</div><div class="sum-sub">加權平均</div></div>
+    <div class="sum-card"><div class="sum-label">累計認列毛利</div>
+      <div class="sum-value g">${(profit/100).toFixed(1)}<span style="font-size:16px"> 億</span></div><div class="sum-sub">ACC577</div></div>
+    <div class="sum-card"><div class="sum-label">Critical / Warning</div>
+      <div class="sum-value"><span style="color:var(--red)">${cR}</span><span style="font-size:18px;color:var(--muted)"> / </span><span style="color:var(--amber)">${cA}</span></div>
+      <div class="sum-sub">高風險 / 注意</div></div>`;
+  document.getElementById('cnt-all').textContent=PROJECTS.length;
+  document.getElementById('cnt-R').textContent=cR;
+  document.getElementById('cnt-A').textContent=cA;
+  document.getElementById('cnt-G').textContent=PROJECTS.filter(p=>p.rag==='G').length;
+}
+
+let pfChartsVisible = true;
+function togglePortfolioCharts(){
+  pfChartsVisible = !pfChartsVisible;
+  const wrap = document.getElementById('portfolio-charts-wrap');
+  const btn  = document.getElementById('chart-toggle-btn');
+  wrap.style.display = pfChartsVisible ? 'grid' : 'none';
+  btn.textContent = pfChartsVisible ? '▼ 收合' : '▶ 展開';
+  btn.classList.toggle('collapsed', !pfChartsVisible);
+}
+
+/* ── AI CEO BRIEF ─────────────────────────────── */
+let aiBriefVisible = true;
+function toggleAIBrief(){
+  aiBriefVisible = !aiBriefVisible;
+  document.getElementById('ai-brief-content').style.display = aiBriefVisible ? 'grid' : 'none';
+  const abt=document.getElementById('ai-brief-toggle');
+  abt.textContent=aiBriefVisible?'▼ 收合':'▶ 展開';
+  abt.classList.toggle('collapsed',!aiBriefVisible);
+}
+
+function refreshAIBrief(){
+  const btn = document.querySelector('#ai-brief-wrap button');
+  document.getElementById('ai-brief-content').innerHTML =
+    `<div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:8px 0;">
+      <div style="width:18px;height:18px;border:2px solid rgba(255,140,0,.3);border-top-color:#FF8A50;
+        border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;"></div>
+      <span style="font-size:13px;color:#FF8A50;letter-spacing:1px;">Genie 正在分析 ${PROJECTS.length} 個專案資料…</span>
+    </div>`;
+  setTimeout(()=>{ renderAIBrief(); }, 1200);
+}
+
+function renderAIBrief(){
+  // 計算所有指標
+  const cntR   = PROJECTS.filter(p=>p.rag==='R').length;
+  const cntA   = PROJECTS.filter(p=>p.rag==='A').length;
+  const avgM   = (PROJECTS.reduce((s,p)=>s+p.margin_cur,0)/PROJECTS.length).toFixed(1);
+  const worst3 = [...PROJECTS].sort((a,b)=>a.margin_cur-b.margin_cur).slice(0,3);
+  const eacOver= PROJECTS.filter(p=>p.eac_bcms>=p.contract*0.97);
+  const bigGap = [...PROJECTS].sort((a,b)=>a.billing_gap-b.billing_gap).slice(0,3);
+  const riskTop= [...PROJECTS].sort((a,b)=>b.risk_cur/b.risk_base - a.risk_cur/a.risk_base).slice(0,3);
+  const totalContract = PROJECTS.reduce((s,p)=>s+p.contract,0);
+  const avgBilled  = (PROJECTS.reduce((s,p)=>s+p.billed_pct,0)/PROJECTS.length).toFixed(1);
+  const avgComplete= (PROJECTS.reduce((s,p)=>s+p.complete_pct,0)/PROJECTS.length).toFixed(1);
+  const cashGap = (PROJECTS.reduce((s,p)=>s+Math.abs(p.billing_gap),0)).toFixed(0);
+
+  // 整體健康狀態
+  const overallHealth = cntR>=5?'critical':cntR>=3?'warning':'normal';
+  const healthColor   = overallHealth==='critical'?'#FF3D3D':overallHealth==='warning'?'#FFB300':'#00E676';
+  const healthLabel   = overallHealth==='critical'?'⚠ 需立即處理':overallHealth==='warning'?'⚡ 持續追蹤':'✅ 整體穩健';
+
+  const cards = [
+    // Card 1: 整體狀況
+    {
+      icon:'📋', title:'整體狀況',
+      color: healthColor,
+      borderColor: healthColor,
+      lines:[
+        `<span style="font-size:15px;font-weight:700;color:${healthColor};font-family:'Arial';">${healthLabel}</span>`,
+        `• ${PROJECTS.length} 案執行中，合約總額 <strong style="color:#00FFFF;">${(totalContract/1000).toFixed(1)} 億</strong>`,
+        `• 高風險 <strong style="color:#FF3D3D;">${cntR} 案</strong>，注意 <strong style="color:#FFB300;">${cntA} 案</strong>`,
+        `• 平均現行毛利率 <strong style="color:${+avgM<8?'#FF3D3D':+avgM<11?'#FFB300':'#00E676'};">${avgM}%</strong>（目標 ≥ 11%）`,
+      ]
+    },
+    // Card 2: 最需關注
+    {
+      icon:'🚨', title:'立即關注',
+      color:'#FF3D3D', borderColor:'#FF3D3D',
+      lines:[
+        eacOver.length>0
+          ? `• <strong style="color:#FF3D3D;">${eacOver.length} 案 EAC 已達合約上限</strong>（${eacOver.map(p=>p.id.trim()).join('、')}）`
+          : `• EAC 控制良好，無超合約案`,
+        `• 毛利最低：<strong style="color:#FF3D3D;">${worst3[0].id.trim()}</strong> ${worst3[0].margin_cur.toFixed(1)}%`,
+        `• 風險金膨脹最高：<strong style="color:#FFB300;">${riskTop[0].id.trim()}</strong>（${(riskTop[0].risk_cur/riskTop[0].risk_base).toFixed(0)}×）`,
+        `• <strong style="color:#FFB300;">建議</strong>：排定 ${cntR} 案緊急 EAC Review`,
+      ]
+    },
+    // Card 3: 現金流
+    {
+      icon:'💰', title:'現金流警示',
+      color:'#FFB300', borderColor:'#FFB300',
+      lines:[
+        `• 平均完工 <strong style="color:#00FFFF;">${avgComplete}%</strong> vs 平均收款 <strong style="color:${+avgBilled<+avgComplete-10?'#FF3D3D':'#FFB300'};">${avgBilled}%</strong>`,
+        `• 全組合收款缺口合計 <strong style="color:#FF3D3D;">${cashGap} M TWD</strong>`,
+        `• 最大缺口：<strong style="color:#FF3D3D;">${bigGap[0].id.trim()}</strong>（${bigGap[0].billing_gap.toFixed(1)} M）`,
+        `• <strong style="color:#FFB300;">建議</strong>：優先追催 ${bigGap.slice(0,2).map(p=>p.id.trim()).join('、')}`,
+      ]
+    }
+  ];
+
+  const now = new Date();
+  document.getElementById('ai-brief-time').textContent =
+    `分析時間 ${now.toLocaleTimeString('zh-TW',{hour12:false})}`;
+
+  document.getElementById('ai-brief-content').innerHTML = cards.map(card=>`
+    <div style="background:rgba(0,0,0,.3);border:1px solid ${card.borderColor}33;
+      border-left:3px solid ${card.borderColor};border-radius:3px;padding:10px 14px;">
+      <div style="font-size:12px;font-weight:700;color:${card.color};
+        letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;font-family:'Arial',sans-serif;">
+        ${card.icon} ${card.title}
+      </div>
+      <div style="font-size:13px;color:#C8DDEF;line-height:1.8;font-family:'Arial','PingFang TC',sans-serif;">
+        ${card.lines.join('<br>')}
+      </div>
+    </div>`).join('');
+}
+
+/* ── PORTFOLIO OVERVIEW CHARTS JS ─────────────── */
+let pfCharts = {};
+
+function renderPortfolioCharts(){
+  // destroy old
+  Object.values(pfCharts).forEach(c=>{ try{c.destroy();}catch(e){} });
+  pfCharts = {};
+
+  const grid = { color:'rgba(0,229,255,.08)' };
+  const tickStyle = { color:'#8BAAC8', font:{size:11, family:"'Arial',sans-serif"} };
+
+  // ── 1. 泡泡圖：X=工期進度, Y=現行毛利率, R=合約金額 ──
+  const bubbleData = PROJECTS.map(p=>({
+    x: +p.schedule_pct.toFixed(1),
+    y: +p.margin_cur.toFixed(2),
+    r: Math.max(5, Math.sqrt(p.contract) * 0.9),
+    label: p.id,
+    name: p.name,
+    rag: p.rag,
+  }));
+  const ragColor = r => r==='R'?'rgba(255,61,61,.75)':r==='A'?'rgba(255,179,0,.75)':'rgba(0,230,118,.75)';
+  const ragBorder = r => r==='R'?'#FF3D3D':r==='A'?'#FFB300':'#00E676';
+
+  pfCharts.bubble = new Chart(document.getElementById('pf-bubble'),{
+    type:'bubble',
+    data:{ datasets:[{
+      data: bubbleData,
+      backgroundColor: bubbleData.map(d=>ragColor(d.rag)),
+      borderColor: bubbleData.map(d=>ragBorder(d.rag)),
+      borderWidth:1.5,
+    }]},
+    options:{
+      responsive:true, animation:{duration:600},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label: c=>{
+            const d=bubbleData[c.dataIndex];
+            return [`${d.label}`, `毛利率: ${d.y}%`, `工期: ${d.x}%`, `合約: ${PROJECTS[c.dataIndex].contract.toFixed(0)}M`];
+          }
+        }}
+      },
+      scales:{
+        x:{ min:0,max:105, grid, ticks:{...tickStyle,callback:v=>v+'%'},
+            title:{display:true,text:'工期進度 →',color:'#8BAAC8',font:{size:11}} },
+        y:{ min:0, grid, ticks:{...tickStyle,callback:v=>v+'%'},
+            title:{display:true,text:'毛利率 →',color:'#8BAAC8',font:{size:11}} },
+      },
+      // 警戒線 y=8
+      annotation:{}
+    },
+    plugins:[{
+      id:'warnLine',
+      afterDraw(chart){
+        const {ctx,scales:{y,x}} = chart;
+        const yPos = y.getPixelForValue(8);
+        ctx.save();
+        ctx.setLineDash([5,4]);
+        ctx.strokeStyle='rgba(255,61,61,.5)';
+        ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(x.left, yPos);
+        ctx.lineTo(x.right, yPos);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle='rgba(255,61,61,.7)';
+        ctx.font="11px Arial";
+        ctx.fillText('8% 警戒', x.right-46, yPos-4);
+        ctx.restore();
+      }
+    }]
+  });
+
+  // ── 2. 毛利率排行橫條圖（Top N）──
+  const nSel   = document.getElementById('margin-rank-n');
+  const dirSel = document.getElementById('margin-rank-dir');
+  const topN   = nSel ? (nSel.value==='20' ? PROJECTS.length : parseInt(nSel.value)) : 10;
+  const isTop  = !dirSel || dirSel.value==='top';
+  // Top = 由高到低取前 N；Bottom = 由低到高取前 N（危險案）
+  const sorted = [...PROJECTS]
+    .sort((a,b)=> isTop ? b.margin_cur-a.margin_cur : a.margin_cur-b.margin_cur)
+    .slice(0, topN);
+  // 副標題動態更新
+  const subLabel = `${isTop?'最高':'最低'} ${topN===PROJECTS.length?'全部':topN} 個專案 · 紅線 = 8% 警戒線`;
+  document.querySelector('#pf-margin-rank').closest('.pchart-card').querySelector('.pchart-sub').textContent = subLabel;
+  const chartH = Math.max(160, topN * 18);
+  const rankCanvas = document.getElementById('pf-margin-rank');
+  rankCanvas.height = chartH;
+  pfCharts.marginRank = new Chart(document.getElementById('pf-margin-rank'),{
+    type:'bar',
+    data:{
+      labels: sorted.map(p=>p.id.trim()),
+      datasets:[{
+        data: sorted.map(p=>+p.margin_cur.toFixed(1)),
+        backgroundColor: sorted.map(p=>p.margin_cur<8?'rgba(255,61,61,.75)':p.margin_cur<11?'rgba(255,179,0,.75)':'rgba(0,230,118,.75)'),
+        borderColor: sorted.map(p=>p.margin_cur<8?'#FF3D3D':p.margin_cur<11?'#FFB300':'#00E676'),
+        borderWidth:1,borderRadius:2,borderSkipped:false,
+      }]
+    },
+    options:{
+      indexAxis:'y', responsive:true, animation:{duration:600},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>` ${c.raw}%  ${sorted[c.dataIndex].name}`}}
+      },
+      scales:{
+        x:{ min:0, grid, ticks:{...tickStyle,callback:v=>v+'%'} },
+        y:{ grid:{display:false}, ticks:{color:'#8BAAC8',font:{size:9}} },
+      },
+    },
+    plugins:[{
+      id:'warnLine2',
+      afterDraw(chart){
+        const {ctx,scales:{x,y}} = chart;
+        const xPos = x.getPixelForValue(8);
+        ctx.save();
+        ctx.setLineDash([4,3]);
+        ctx.strokeStyle='rgba(255,61,61,.6)';
+        ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(xPos,y.top);
+        ctx.lineTo(xPos,y.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle='rgba(255,61,61,.8)';
+        ctx.font="10px Arial";
+        ctx.fillText('8%',xPos+3,y.top+12);
+        ctx.restore();
+      }
+    }]
+  });
+
+  // ── 3. RAG 環形圖 + 財務統計 ──
+  const cntR=PROJECTS.filter(p=>p.rag==='R').length;
+  const cntA=PROJECTS.filter(p=>p.rag==='A').length;
+  const cntG=PROJECTS.filter(p=>p.rag==='G').length;
+  pfCharts.donut = new Chart(document.getElementById('pf-rag-donut'),{
+    type:'doughnut',
+    data:{
+      labels:['高風險','注意','正常'],
+      datasets:[{
+        data:[cntR,cntA,cntG],
+        backgroundColor:['rgba(255,61,61,.8)','rgba(255,179,0,.8)','rgba(0,230,118,.8)'],
+        borderColor:['#FF3D3D','#FFB300','#00E676'],
+        borderWidth:2, hoverOffset:6,
+      }]
+    },
+    options:{
+      responsive:false, cutout:'65%', animation:{duration:600},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} 案`}}
+      },
+    },
+    plugins:[{
+      id:'centerText',
+      afterDraw(chart){
+        const {ctx,chartArea:{width,height,left,top}}=chart;
+        ctx.save();
+        ctx.textAlign='center';
+        ctx.textBaseline='middle';
+        const cx=left+width/2, cy=top+height/2;
+        ctx.font=`bold 22px Arial`;
+        ctx.fillStyle=cntR>3?'#FF3D3D':cntR>1?'#FFB300':'#00E676';
+        ctx.fillText(PROJECTS.length, cx, cy-8);
+        ctx.font=`11px Arial`;
+        ctx.fillStyle='#8BAAC8';
+        ctx.fillText('專案', cx, cy+10);
+        ctx.restore();
+      }
+    }]
+  });
+
+  // 財務統計
+  const totalContract = PROJECTS.reduce((s,p)=>s+p.contract,0);
+  const avgBillingGap = PROJECTS.reduce((s,p)=>s+p.billing_gap,0)/PROJECTS.length;
+  const avgComplete = PROJECTS.reduce((s,p)=>s+p.complete_pct,0)/PROJECTS.length;
+  const avgBilled = PROJECTS.reduce((s,p)=>s+p.billed_pct,0)/PROJECTS.length;
+  const eacOver = PROJECTS.filter(p=>p.eac_bcms>=p.contract*0.97).length;
+
+  document.getElementById('pf-stats').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:#8BAAC8;">🔴 高風險</span>
+        <span style="font-size:16px;font-weight:700;color:#FF3D3D;font-family:'Arial',sans-serif;">${cntR} 案</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:#8BAAC8;">⚠ EAC超合約</span>
+        <span style="font-size:16px;font-weight:700;color:#FFB300;font-family:'Arial',sans-serif;">${eacOver} 案</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:#8BAAC8;">📑 平均完工</span>
+        <span style="font-size:16px;font-weight:700;color:#00FFFF;font-family:'Arial',sans-serif;">${avgComplete.toFixed(1)}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:#8BAAC8;">💳 平均收款</span>
+        <span style="font-size:16px;font-weight:700;color:${avgBilled<avgComplete-10?'#FF3D3D':'#00E676'};font-family:'Arial',sans-serif;">${avgBilled.toFixed(1)}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:12px;color:#8BAAC8;">💰 合約總額</span>
+        <span style="font-size:16px;font-weight:700;color:#00FFFF;font-family:'Arial',sans-serif;">${(totalContract/1000).toFixed(1)}億</span>
+      </div>
+    </div>`;
+}
+
+/* ── TABLE ───────────────────────────────────── */
+function renderTable(){
+  const q=document.getElementById('searchBox').value.toLowerCase();
+  let data=PROJECTS.filter(p=>{
+    if(activeFilter!=='all'&&p.rag!==activeFilter)return false;
+    if(q&&!p.name.toLowerCase().includes(q)&&!p.pm.toLowerCase().includes(q)
+       &&!p.id.toLowerCase().includes(q)&&!p.client.toLowerCase().includes(q))return false;
+    return true;
+  });
+  data.sort((a,b)=>{
+    let va,vb;
+    if(sortKey==='rag'){va=ragOrder(a.rag);vb=ragOrder(b.rag);}
+    else if(['name','pm','id'].includes(sortKey)){va=a[sortKey];vb=b[sortKey];}
+    else{va=a[sortKey]??0;vb=b[sortKey]??0;}
+    if(typeof va==='string')return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    return sortAsc?va-vb:vb-va;
+  });
+  const mC=p=>p.margin_cur<8?'var(--red)':p.margin_cur<11?'var(--amber)':'var(--green)';
+  const bC=p=>p.billing_gap<-10?'var(--red)':p.billing_gap<-5?'var(--amber)':'var(--green)';
+  document.getElementById('proj-tbody').innerHTML=data.map(p=>{
+    const md=(p.margin_cur-p.margin_base).toFixed(1);
+    const pd=(p.cost_pct-p.self_pct).toFixed(1);
+    const rm=(p.risk_cur/p.risk_base).toFixed(1);
+    return `<tr onclick="showDetail('${p.id}')">
+      <td><span class="rag ${p.rag}"><span class="rag-dot"></span>${p.rag==='R'?'CRITICAL':p.rag==='A'?'WARNING':'NORMAL'}</span></td>
+      <td style="font-family:monospace;color:var(--cyan);font-size:11px">${p.id}</td>
+      <td>
+        <div class="proj-name-cell">
+          <img class="proj-thumb" src="${PROJ_PHOTOS[p.id]||''}" alt=""
+            onerror="this.style.display='none'">
+          <div>
+            <div style="font-weight:700;color:var(--text)">${p.name}</div>
+            <div style="font-size:13px;color:#A8C4D8">${p.client}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:14px;color:#A8C4D8">${p.pm}</td>
+      <td style="font-weight:700;color:var(--cyan)">${p.contract.toFixed(0)} M</td>
+      <td><div style="font-weight:700;color:${mC(p)}">${pct(p.margin_cur)}</div>
+          <span class="delta ${+md<0?'neg':+md>0?'pos':'warn'}">${+md>0?'+':''}${md}pp</span></td>
+      <td style="min-width:130px">
+        <div class="mini-bar-wrap" style="margin-bottom:3px">
+          <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${p.cost_pct}%;background:var(--orange)"></div></div>
+          <div class="mini-val" style="color:var(--orange)">${pct(p.cost_pct)}</div>
+        </div>
+        <div class="mini-bar-wrap">
+          <div class="mini-bar-bg"><div class="mini-bar-fill" style="width:${p.self_pct}%;background:var(--cyan)"></div></div>
+          <div class="mini-val" style="color:var(--cyan)">${pct(p.self_pct)}</div>
+        </div>
+        <span class="delta ${Math.abs(+pd)>5?'neg':Math.abs(+pd)>2?'warn':'pos'}" style="font-size:9px">Δ ${+pd>0?'+':''}${pd}pp</span>
+      </td>
+      <td><div style="font-weight:700;color:${bC(p)}">${p.billing_gap.toFixed(1)} M</div>
+          <span class="delta ${p.billing_gap<-10?'neg':p.billing_gap<-5?'warn':'pos'}">${pct(p.billed_pct)} / ${pct(p.complete_pct)}</span></td>
+      <td><div style="font-weight:700;color:var(--amber)">${(p.risk_cur/100).toFixed(0)} 萬</div>
+          <span class="delta ${+rm>10?'neg':+rm>3?'warn':'pos'}">${rm}×</span></td>
+      <td style="font-size:16px;color:#C8DDEF;max-width:200px;letter-spacing:.3px;font-weight:600">${p.alerts[0]}</td>
+    </tr>`;
+  }).join('');
+}
+
+function setFilter(f,el,cls){
+  activeFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.className='filter-btn');
+  el.className=`filter-btn active-${cls}`;
+  renderBoth();
+}
+function sortBy(key){
+  if(sortKey===key)sortAsc=!sortAsc;else{sortKey=key;sortAsc=true;}
+  document.querySelectorAll('thead th').forEach(t=>t.classList.remove('sorted'));
+  const th=document.getElementById('th-'+key);
+  if(th)th.classList.add('sorted');
+  renderTable();
+}
+
+/* ── DETAIL ──────────────────────────────────── */
+let genieCurrentProject=null;
+function showDetail(id){
+  const p=PROJECTS.find(x=>x.id===id);if(!p)return;
+  Object.values(detailCharts).forEach(c=>c.destroy());detailCharts={};
+  const vp=document.getElementById('view-portfolio');
+  const vd=document.getElementById('view-detail');
+  vp.style.cssText='display:none!important';
+  vd.style.cssText='display:block;position:relative;z-index:1;';
+  document.getElementById('backBtn').classList.add('show');
+  genieCurrentProject=p; updateGenieContext();
+  showFloatNav();
+  reportProject=p;
+  renderDiagnostics(p);
+  renderCostDrilldown(p);
+  renderPMComments(p);
+  // 重置報告區
+  document.getElementById('report-output').classList.remove('show');
+  [1,2,3,4,5,6].forEach(i=>document.getElementById('flow-'+i).classList.remove('active','done'));
+
+  const heroImg = document.getElementById('d-hero-img');
+  heroImg.style.display='none';
+  if(PROJ_PHOTOS[p.id]){
+    const url = PROJ_HERO_MAP[PROJ_PHOTOS[p.id]] || PROJ_PHOTOS[p.id];
+    heroImg.onload = () => { heroImg.style.display='block'; };
+    heroImg.onerror = () => { heroImg.style.display='none'; };
+    heroImg.src = url;
+  }
+
+  document.getElementById('d-rag-badge').innerHTML=
+    `<span class="rag ${p.rag}"><span class="rag-dot"></span>${p.rag==='R'?'CRITICAL':p.rag==='A'?'WARNING':'NORMAL'}</span>`;
+  document.getElementById('d-proj-name').textContent=`[ ${p.id} ]  ${p.name}`;
+  document.getElementById('d-proj-meta').innerHTML=
+    `<span>▸ ${p.dept}</span><span>PM: ${p.pm}</span><span>CSE: ${p.cse}</span>`+
+    `<span>CLIENT: ${p.client}</span><span>${p.start} → ${p.end}</span>`;
+
+  const md=(p.margin_cur-p.margin_base).toFixed(1);
+  const pd=(p.cost_pct-p.self_pct).toFixed(1);
+  const rm=(p.risk_cur/p.risk_base).toFixed(1);
+  const mC=p.margin_cur<8?'red':p.margin_cur<11?'amber':'green';
+  const pC=Math.abs(+pd)>5?'red':Math.abs(+pd)>2?'amber':'green';
+  const bC=p.billing_gap<-10?'red':p.billing_gap<-5?'amber':'green';
+  const rC=+rm>10?'red':+rm>3?'amber':'green';
+  const tc={red:'neg',amber:'warn',green:'pos'};
+  document.getElementById('d-kpi-grid').innerHTML=`
+    <div class="dkpi ${mC}"><div class="dkpi-label">現行毛利率</div>
+      <div class="dkpi-value" style="color:${colorHex[mC]}">${pct(p.margin_cur)}</div>
+      <div class="dkpi-sub">成案目標：${pct(p.margin_base)}</div>
+      <span class="dkpi-tag ${tc[mC]}">${+md>0?'+':''}${md} pp</span></div>
+    <div class="dkpi cyan"><div class="dkpi-label">累計認列營收</div>
+      <div class="dkpi-value" style="color:#00FFFF">${p.revenue_acc.toFixed(1)} M</div>
+      <div class="dkpi-sub">完工比例 ${pct(p.complete_pct)}</div>
+      <span class="dkpi-tag pos">ACC577</span></div>
+    <div class="dkpi ${pC}"><div class="dkpi-label">進度偏差（成本−自評）</div>
+      <div class="dkpi-value" style="color:${colorHex[pC]}">${+pd>0?'+':''}${pd}%</div>
+      <div class="dkpi-sub">${pct(p.cost_pct)} vs ${pct(p.self_pct)}</div>
+      <span class="dkpi-tag ${tc[pC]}">${+pd>0?'成本超前':'進度超前'}</span></div>
+    <div class="dkpi ${bC}"><div class="dkpi-label">收款缺口</div>
+      <div class="dkpi-value" style="color:${colorHex[bC]}">${p.billing_gap.toFixed(1)} M</div>
+      <div class="dkpi-sub">${pct(p.billed_pct)} vs 完工 ${pct(p.complete_pct)}</div>
+      <span class="dkpi-tag ${tc[bC]}">${(p.complete_pct-p.billed_pct).toFixed(1)}pp 落後</span></div>
+    <div class="dkpi ${rC}"><div class="dkpi-label">風險準備金</div>
+      <div class="dkpi-value" style="color:${colorHex[rC]}">${(p.risk_cur/100).toFixed(0)} 萬</div>
+      <div class="dkpi-sub">成案：${(p.risk_base/100).toFixed(0)} 萬</div>
+      <span class="dkpi-tag ${tc[rC]}">${rm}× 膨脹</span></div>`;
+
+  const bars=[
+    {label:'⏱ 工期進度',val:p.schedule_pct,color:C.blue,ref:null},
+    {label:'💸 成本進度',val:p.cost_pct,color:C.orange,ref:p.schedule_pct},
+    {label:'🎯 自評進度',val:p.self_pct,color:C.cyan,ref:p.cost_pct},
+    {label:'📑 完工比例',val:p.complete_pct,color:C.green,ref:p.billed_pct},
+  ];
+  document.getElementById('d-progress-bars').innerHTML=bars.map(b=>`
+    <div class="prog-item">
+      <div class="prog-hd"><span class="prog-label">${b.label}</span>
+        <span class="prog-val" style="color:${b.color}">${pct(b.val)}</span></div>
+      <div class="prog-bg">
+        <div class="prog-fill" style="width:${Math.min(b.val,100)}%;background:${b.color};box-shadow:0 0 6px ${b.color}88"></div>
+        ${b.ref!=null?`<div class="prog-marker" style="left:${Math.min(b.ref,100)}%"><div class="prog-marker-tip">${pct(b.ref)}</div></div>`:''}
+      </div></div>`).join('');
+
+  const chartOpts={responsive:true,animation:{duration:600},
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{color:'rgba(0,229,255,.06)'}},y:{grid:{color:'rgba(0,229,255,.06)'}}}};
+
+  detailCharts.margin=new Chart(document.getElementById('d-margin-chart'),{type:'bar',
+    data:{labels:['成案','現行','會計'],datasets:[{data:[p.margin_base,p.margin_cur,p.margin_acc],
+      backgroundColor:[C.green,p.margin_cur<8?C.red:p.margin_cur<11?C.amber:C.green,C.cyan],
+      borderRadius:1,borderSkipped:false}]},
+    options:{...chartOpts,scales:{y:{...chartOpts.scales.y,ticks:{callback:v=>v+'%'},min:0},x:{grid:{display:false}}}}});
+
+  detailCharts.amount=new Chart(document.getElementById('d-amount-chart'),{type:'bar',
+    data:{labels:['合約','會計 EAC','BCMS EAC','累計營收','累計成本'],
+      datasets:[{data:[p.contract,p.eac_acc,p.eac_bcms,p.revenue_acc,p.cost_acc],
+        backgroundColor:[C.cyan,C.orange,C.purple,C.green,C.amber],borderRadius:1,borderSkipped:false}]},
+    options:{...chartOpts,indexAxis:'y',
+      scales:{x:{...chartOpts.scales.x,ticks:{callback:v=>v+'M'}},y:{grid:{display:false}}}}});
+
+  detailCharts.mh=new Chart(document.getElementById('d-mh-chart'),{type:'bar',
+    data:{labels:['工時\nBudget','工時\n實際','材料\nBudget','材料\n實際','發包\nBudget','發包\n實際'],
+      datasets:[{data:[p.mh_budget/1000,p.mh_actual/1000,p.mat_budget,p.mat_actual,p.sub_budget,p.sub_actual],
+        backgroundColor:[C.blue,p.mh_actual>p.mh_budget?C.red:C.green,
+          C.cyan,p.mat_actual>p.mat_budget?C.red:C.green,
+          C.orange,p.sub_actual>p.sub_budget?C.red:(p.sub_actual/p.sub_budget)<0.6?C.amber:C.green],
+        borderRadius:1,borderSkipped:false}]},
+    options:{...chartOpts,plugins:{...chartOpts.plugins,legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.dataIndex<2?` ${c.raw.toFixed(1)} K MH`:` ${c.raw.toFixed(1)} M`}}},
+      scales:{y:{...chartOpts.scales.y},x:{grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  /* ── 1. 六維健康雷達 ─────────────────────────── */
+  const radarScores={
+    '毛利健康': Math.max(0,Math.min(100,(p.margin_cur/14)*100)),
+    '進度偏差': Math.max(0,100-Math.abs(p.cost_pct-p.self_pct)*8),
+    '收款狀況': Math.max(0,100-Math.abs(p.billing_gap)/p.contract*500),
+    '風險控制': Math.max(0,100-(p.risk_cur/p.risk_base-1)*5),
+    '工時效率': Math.max(0,Math.min(100,(p.mh_budget/Math.max(p.mh_actual,1))*80)),
+    '發包執行': Math.max(0,Math.min(100,(p.sub_actual/p.sub_budget)/(p.self_pct/100)*80)),
+  };
+  const radarVals=Object.values(radarScores).map(v=>Math.round(v));
+  const overallScore=Math.round(radarVals.reduce((s,v)=>s+v,0)/radarVals.length);
+  const scoreColor=overallScore>=70?C.green:overallScore>=45?C.amber:C.red;
+  const scoreLabel=overallScore>=70?'HEALTHY':overallScore>=45?'AT RISK':'CRITICAL';
+  document.getElementById('d-health-score').textContent=overallScore;
+  document.getElementById('d-health-score').style.color=scoreColor;
+  document.getElementById('d-health-label').textContent=scoreLabel;
+  document.getElementById('d-health-label').style.color=scoreColor;
+  document.getElementById('d-health-dims').innerHTML=Object.entries(radarScores).map(([k,v])=>{
+    const vc=v>=70?C.green:v>=45?C.amber:C.red;
+    return `<div class="health-dim"><span class="health-dim-name">${k}</span>
+      <span class="health-dim-score" style="color:${vc}">${Math.round(v)}</span></div>`;
+  }).join('');
+  detailCharts.radar=new Chart(document.getElementById('d-radar-chart'),{
+    type:'radar',
+    data:{labels:Object.keys(radarScores),datasets:[{
+      label:'健康分數',data:radarVals,
+      backgroundColor:'rgba(0,229,255,.12)',borderColor:'rgba(0,229,255,.8)',borderWidth:2,
+      pointBackgroundColor:radarVals.map(v=>v>=70?C.green:v>=45?C.amber:C.red),
+      pointBorderColor:'#fff',pointRadius:5,pointHoverRadius:7,
+    },{
+      label:'目標（80分）',data:[80,80,80,80,80,80],
+      backgroundColor:'rgba(255,179,0,.04)',borderColor:'rgba(255,179,0,.35)',
+      borderWidth:1.5,borderDash:[4,4],pointRadius:0,fill:false,
+    }]},
+    options:{responsive:true,animation:{duration:800},
+      scales:{r:{min:0,max:100,
+        grid:{color:'rgba(0,229,255,.1)'},angleLines:{color:'rgba(0,229,255,.15)'},
+        pointLabels:{color:'#C8DDEF',font:{size:13,family:"'Arial',sans-serif"}},
+        ticks:{display:false,stepSize:20},
+      }},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} 分`}}},
+    }
+  });
+
+  /* ── 2. 甘特圖 ───────────────────────────────── */
+  const phases=[
+    {name:'ENGINEERING', plan:[0,30],  actual:[0,28],  status:'done'},
+    {name:'PROCUREMENT', plan:[15,55], actual:[15,50], status:'done'},
+    {name:'CONSTRUCTION',plan:[40,85], actual:[40,Math.round(p.self_pct)], status:p.self_pct<70?'late':'warn'},
+    {name:'TESTING',     plan:[75,95], actual:[75,p.self_pct>75?Math.round(p.self_pct*0.85):null], status:'late'},
+    {name:'HANDOVER',    plan:[90,100],actual:[null,null], status:'planned'},
+  ];
+  const today=Math.round(p.schedule_pct);
+  const barColors={done:C.green,warn:C.amber,late:C.orange,planned:'rgba(0,229,255,.2)'};
+  document.getElementById('d-gantt').innerHTML=phases.map((ph,i)=>{
+    const planW=ph.plan[1]-ph.plan[0], planL=ph.plan[0];
+    let actualBar='';
+    if(ph.actual[0]!==null&&ph.actual[1]!==null){
+      const aw=ph.actual[1]-ph.actual[0],al=ph.actual[0];
+      actualBar=`<div class="gantt-bar" style="left:${al}%;width:${aw}%;background:${barColors[ph.status]};opacity:.85;">${aw>10?ph.name:''}</div>`;
+    }
+    return `<div class="gantt-row">
+      <div class="gantt-label">${ph.name}</div>
+      <div class="gantt-track">
+        <div style="position:absolute;left:${planL}%;width:${planW}%;height:100%;background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.25);border-radius:2px;"></div>
+        ${actualBar}
+        <div class="gantt-today" style="left:${today}%">${i===0?`<div class="gantt-today-lbl">TODAY ${today}%</div>`:''}</div>
+      </div></div>`;
+  }).join('');
+
+  /* ── 3. EAC 趨勢折線圖 ────────────────────────── */
+  if(p.eac_bcms>=p.contract*0.97) document.getElementById('d-eac-warn').style.display='flex';
+  else document.getElementById('d-eac-warn').style.display='none';
+  const months=['2024/01','2024/04','2024/07','2024/10','2025/01','2025/04','2025/07','2025/10','2026/01','2026/04','2026/05'];
+  const eacProg=months.map((m,i)=>{
+    const prog=i/10;
+    return +( p.eac_bcms*(0.85+prog*0.15+Math.sin(i*1.7)*0.018) ).toFixed(1);
+  });
+  eacProg[eacProg.length-1]=p.eac_bcms;
+  detailCharts.eac=new Chart(document.getElementById('d-eac-chart'),{type:'line',
+    data:{labels:months,datasets:[
+      {label:'EAC (BCMS)',data:eacProg,
+        borderColor:p.eac_bcms>=p.contract?C.red:C.amber,
+        backgroundColor:p.eac_bcms>=p.contract?'rgba(255,61,61,.1)':'rgba(255,179,0,.1)',
+        borderWidth:2.5,fill:true,tension:.4,pointRadius:3,pointHoverRadius:6,
+        pointBackgroundColor:p.eac_bcms>=p.contract?C.red:C.amber},
+      {label:'合約金額',data:Array(months.length).fill(p.contract),
+        borderColor:'rgba(0,229,255,.5)',borderWidth:1.5,borderDash:[6,4],fill:false,pointRadius:0},
+      {label:'成案基準',data:Array(months.length).fill(+(p.contract*(1-p.margin_base/100)).toFixed(1)),
+        borderColor:'rgba(0,230,118,.3)',borderWidth:1,borderDash:[3,6],fill:false,pointRadius:0},
+    ]},
+    options:{responsive:true,animation:{duration:800},
+      plugins:{legend:{display:true,labels:{color:'#A8C4D8',font:{size:12},boxWidth:14}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw} M`}}},
+      scales:{x:{grid:{color:'rgba(0,229,255,.06)'},ticks:{color:'#8BAAC8',font:{size:10},maxRotation:45}},
+        y:{grid:{color:'rgba(0,229,255,.06)'},ticks:{color:'#8BAAC8',callback:v=>v+'M'}}}}
+  });
+
+  /* ── 4. 收款瀑布圖 ────────────────────────────── */
+  const wfVals=[p.contract, p.revenue_acc, p.revenue_acc*(p.billed_pct/p.complete_pct||0),
+    Math.abs(p.billing_gap), p.contract-p.revenue_acc];
+  detailCharts.waterfall=new Chart(document.getElementById('d-waterfall-chart'),{type:'bar',
+    data:{labels:['合約金額','已認列營收','已收款','收款缺口','未認列'],
+      datasets:[{data:wfVals,
+        backgroundColor:[C.cyan,C.blue,C.green,C.red,'rgba(255,255,255,.15)'],
+        borderRadius:2,borderSkipped:false}]},
+    options:{responsive:true,animation:{duration:800},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toFixed(1)} M TWD`}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#A8C4D8',font:{size:12}}},
+        y:{grid:{color:'rgba(0,229,255,.06)'},ticks:{color:'#8BAAC8',callback:v=>v+'M'}}}}
+  });
+
+  /* ── 5. 完工毛利率情境 ────────────────────────── */
+  const sVals=[+(p.margin_cur-2.5).toFixed(1), +(p.margin_cur-0.5).toFixed(1), +(p.margin_cur+1.5).toFixed(1)];
+  detailCharts.scenario=new Chart(document.getElementById('d-scenario-chart'),{
+    type:'bar',
+    data:{labels:['悲觀\n(-2.5pp)','基準\n(-0.5pp)','樂觀\n(+1.5pp)'],
+      datasets:[
+        {data:sVals,backgroundColor:[C.red,C.amber,C.green],borderRadius:3,borderSkipped:false},
+        {type:'line',label:'成案目標',data:Array(3).fill(p.margin_base),
+          borderColor:'rgba(0,229,255,.6)',borderWidth:2,borderDash:[5,4],pointRadius:0,fill:false},
+      ]},
+    options:{responsive:true,animation:{duration:800},
+      plugins:{legend:{display:true,labels:{color:'#A8C4D8',font:{size:12},boxWidth:14}},
+        tooltip:{callbacks:{label:c=>` ${c.raw}%`}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#A8C4D8',font:{size:12}}},
+        y:{grid:{color:'rgba(0,229,255,.06)'},ticks:{color:'#8BAAC8',callback:v=>v+'%'},
+          min:Math.max(0,sVals[0]-3)}}}
+  });
+  document.getElementById('d-scenario-desc').innerHTML=
+    `• 悲觀 <strong style="color:${C.red}">${sVals[0]}%</strong>：風險金全啟用＋工期延誤<br>`+
+    `• 基準 <strong style="color:${C.amber}">${sVals[1]}%</strong>：現況不變，照速完工<br>`+
+    `• 樂觀 <strong style="color:${C.green}">${sVals[2]}%</strong>：發包議價成功＋加速收款`;
+
+  const ad=[
+    {label:'現行毛利率',cur:pct(p.margin_cur),target:pct(p.margin_base),diff:`${(p.margin_cur-p.margin_base).toFixed(1)}pp`,rag:p.margin_cur<8?'R':p.margin_cur<11?'A':'G'},
+    {label:'進度偏差',cur:pct(p.cost_pct),target:pct(p.self_pct),diff:`${(p.cost_pct-p.self_pct).toFixed(1)}pp`,rag:Math.abs(p.cost_pct-p.self_pct)>5?'R':Math.abs(p.cost_pct-p.self_pct)>2?'A':'G'},
+    {label:'收款落後',cur:pct(p.billed_pct),target:pct(p.complete_pct),diff:`${(p.billed_pct-p.complete_pct).toFixed(1)}pp`,rag:p.billing_gap<-10?'R':p.billing_gap<-5?'A':'G'},
+    {label:'風險準備金',cur:`${(p.risk_cur/100).toFixed(0)}萬`,target:`${(p.risk_base/100).toFixed(0)}萬`,diff:`${rm}×`,rag:+rm>10?'R':+rm>3?'A':'G'},
+    {label:'發包執行率',cur:pct(p.sub_actual/p.sub_budget*100),target:'≥自評',diff:`${((p.sub_actual/p.sub_budget*100)-p.self_pct).toFixed(1)}pp`,rag:(p.sub_actual/p.sub_budget*100)<p.self_pct-10?'R':(p.sub_actual/p.sub_budget*100)<p.self_pct-5?'A':'G'},
+  ];
+  document.getElementById('d-alert-table').innerHTML=`
+    <table class="alert-tbl">
+      <thead><tr><th>Item</th><th>現況</th><th>目標</th><th>Δ</th><th>Status</th></tr></thead>
+      <tbody>${ad.map(a=>`<tr>
+        <td style="font-weight:700;color:var(--text)">${a.label}</td>
+        <td style="font-weight:700;color:${a.rag==='R'?'var(--red)':a.rag==='A'?'var(--amber)':'var(--green)'}">${a.cur}</td>
+        <td style="color:var(--muted)">${a.target}</td><td>${a.diff}</td>
+        <td><span class="pill ${a.rag}">${a.rag==='R'?'CRIT':a.rag==='A'?'WARN':'OK'}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+}
+
+function showPortfolio(){
+  const vp2=document.getElementById('view-portfolio');
+  const vd2=document.getElementById('view-detail');
+  vp2.style.cssText='display:block;position:relative;z-index:1;';
+  vd2.style.cssText='display:none!important';
+  document.getElementById('backBtn').classList.remove('show');
+  genieCurrentProject=null; updateGenieContext();
+  hideFloatNav();
+}
+
+/* ── GENIE ───────────────────────────────────── */
+const PORTFOLIO_CHIPS=['哪些案子毛利下滑超過 5pp？','風險準備金膨脹最嚴重前 5 案','收款落後超過 10pp 的專案','高風險案的共同特徵','EAC 會超合約的案子預測','PM 財務健康度排名'];
+const PROJECT_CHIPS=['毛利下滑主因分析','發包進度風險','收款缺口影響','與同類案比較','最優先介入行動','預測完工毛利率'];
+
+function initGenieChips(){renderGenieChips(PORTFOLIO_CHIPS);}
+function renderGenieChips(chips){
+  document.getElementById('genieChips').innerHTML=chips.map(c=>
+    `<button class="genie-chip" onclick="selectChip(this,'${c.replace(/'/g,"\\'")}')">
+      ${c.length>16?c.substring(0,15)+'…':c}</button>`).join('');
+}
+function selectChip(el,text){
+  document.querySelectorAll('.genie-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('genieInput').value=text;
+  runGenie();
+}
+function openGenie(){
+  document.getElementById('genieOverlay').classList.add('open');
+  document.getElementById('genieDrawer').classList.add('open');
+  updateGenieContext();
+}
+function closeGenie(){
+  document.getElementById('genieOverlay').classList.remove('open');
+  document.getElementById('genieDrawer').classList.remove('open');
+}
+function updateGenieContext(){
+  const ctx=document.getElementById('genieContextText');
+  if(genieCurrentProject){
+    ctx.textContent=`分析範圍：${genieCurrentProject.id} — ${genieCurrentProject.name}`;
+    renderGenieChips(PROJECT_CHIPS);
+  }else{
+    ctx.textContent=`分析範圍：全部 ${PROJECTS.length} 個專案`;
+    renderGenieChips(PORTFOLIO_CHIPS);
+  }
+}
+
+function generateSQL(query,p){
+  const q=query.toLowerCase();
+  if(q.includes('毛利')&&q.includes('下滑'))return`-- Databricks SQL · Unity Catalog: asi_projects.bcms
+SELECT project_id, project_name, pm,
+       margin_baseline, margin_current,
+       ROUND(margin_current - margin_baseline, 2) AS margin_delta_pp
+FROM   asi_projects.bcms.v_project_kpi
+WHERE  (margin_current - margin_baseline) < -5
+ORDER  BY margin_delta_pp ASC LIMIT 10;`;
+  if(q.includes('風險準備金')||q.includes('膨脹'))return`-- Databricks SQL · Unity Catalog: asi_projects.bcms
+SELECT project_id, project_name,
+       risk_reserve_baseline, risk_reserve_current,
+       ROUND(risk_reserve_current/NULLIF(risk_reserve_baseline,0),1) AS inflation_x
+FROM   asi_projects.bcms.v_risk_reserve
+WHERE  risk_reserve_current > risk_reserve_baseline * 3
+ORDER  BY inflation_x DESC LIMIT 5;`;
+  if(q.includes('收款'))return`-- Databricks SQL · Unity Catalog: asi_projects.bcms
+SELECT project_id, project_name, pm,
+       billed_pct, complete_pct,
+       ROUND(billed_pct - complete_pct, 1) AS billing_gap_pp,
+       billing_gap_amount_m
+FROM   asi_projects.bcms.v_billing_status
+WHERE  (complete_pct - billed_pct) > 10
+ORDER  BY billing_gap_pp ASC;`;
+  if(p&&(q.includes('主因')||q.includes('發包')))return`-- Databricks SQL · 單案深探: ${p.id}
+SELECT cost_category, cost_budget, cost_actual,
+       ROUND(cost_actual - cost_budget, 2) AS overrun_m
+FROM   asi_projects.bcms.v_cost_detail
+WHERE  project_id = '${p.id}'
+ORDER  BY overrun_m DESC;`;
+  return`-- Databricks SQL · Unity Catalog: asi_projects.bcms
+SELECT project_id, project_name, rag_status,
+       margin_current, cost_pct, self_pct,
+       billing_gap_amount_m, risk_inflation_x
+FROM   asi_projects.bcms.v_project_kpi
+ORDER  BY rag_status ASC, margin_current ASC LIMIT 20;`;
+}
+
+function analyzeQuery(query,p){
+  const q=query.toLowerCase();
+  if(!p){
+    const rd=PROJECTS.filter(x=>x.rag==='R');
+    const bd=PROJECTS.filter(x=>x.margin_cur-x.margin_base<-5).sort((a,b)=>(a.margin_cur-a.margin_base)-(b.margin_cur-b.margin_base));
+    const hr=PROJECTS.filter(x=>x.risk_cur/x.risk_base>10).sort((a,b)=>b.risk_cur/b.risk_base-a.risk_cur/a.risk_base);
+    const bb=PROJECTS.filter(x=>x.billing_gap<-10).sort((a,b)=>a.billing_gap-b.billing_gap);
+    if(q.includes('毛利'))return{insights:[
+      {type:'critical',icon:'⚠',title:`${bd.length} 個案子毛利下滑超過 5pp`,badge:'critical',
+        body:bd.slice(0,4).map(x=>`• ${x.id} ${x.name}：${x.margin_base.toFixed(1)}% → ${x.margin_cur.toFixed(1)}%（${(x.margin_cur-x.margin_base).toFixed(1)}pp）`).join('\n')},
+      {type:'warning',icon:'🔍',title:'共同特徵：尾期風險 + SE&C 膨脹',badge:'pattern',
+        body:`• 工期皆已超過 70%（尾期風險高）\n• 風險準備金均有膨脹\n• 發包結算差異為主因`},
+      {type:'info',icon:'✦',title:'Genie ML 預測',badge:'AI forecast',
+        body:`${bd.filter(x=>x.schedule_pct>80).length} 個案在完工前仍有進一步下滑風險\n建議設 −2pp 作為預警閾值`},
+    ],actions:[
+      {priority:'立即',text:`召開 ${bd.slice(0,2).map(x=>x.id).join('、')} 緊急評估會`},
+      {priority:'本週',text:'要求 PM 提交成本超控根因分析'},
+      {priority:'本月',text:'建立 EAC 自動警示機制'},
+    ]};
+    if(q.includes('風險準備金')||q.includes('膨脹'))return{insights:[
+      {type:'critical',icon:'🛡',title:`${hr.length} 案風險準備金膨脹超 10×`,badge:'critical',
+        body:hr.slice(0,4).map(x=>`• ${x.id}：${(x.risk_cur/100).toFixed(0)} 萬（${(x.risk_cur/x.risk_base).toFixed(0)}×）`).join('\n')},
+      {type:'warning',icon:'📊',title:'SE&C 膨脹是主驅動因素',badge:'root cause',
+        body:`設計變更頻繁、發包廠商績效不達標\n工期延長帶來的管理成本增加`},
+      {type:'info',icon:'✦',title:'電力廠案風險金高於石化案',badge:'AI insight',
+        body:`電力廠平均膨脹倍數較石化高\n建議電力廠類型案提高成案風險金預留`},
+    ],actions:[
+      {priority:'立即',text:'凍結高風險案風險金動用，需 CEO 批准'},
+      {priority:'本週',text:'逐案盤點 SE&C，確認是否反映在 EAC'},
+      {priority:'本月',text:'修訂成案風險金標準，電力廠加計 1.5×'},
+    ]};
+    if(q.includes('收款'))return{insights:[
+      {type:'critical',icon:'💳',title:`${bb.length} 案收款落後完工超 10pp`,badge:'cash risk',
+        body:bb.slice(0,4).map(x=>`• ${x.id} ${x.name}：缺口 ${x.billing_gap.toFixed(1)} M`).join('\n')},
+      {type:'warning',icon:'💰',title:`未收款合計 ${bb.reduce((s,x)=>s+Math.abs(x.billing_gap),0).toFixed(0)} M`,badge:'impact',
+        body:`每月資金成本約 ${(bb.reduce((s,x)=>s+Math.abs(x.billing_gap),0)*0.03/12).toFixed(1)} M\n年節省潛力 ${(bb.reduce((s,x)=>s+Math.abs(x.billing_gap),0)*0.03).toFixed(0)} M`},
+      {type:'info',icon:'✦',title:'Genie 建議優先追催案',badge:'AI action',body:`優先追催：${bb[0]?.id||'22 6700C'}（缺口最大）`},
+    ],actions:[
+      {priority:'立即',text:`致電 ${bb[0]?.client||'客戶'} 確認付款時程`},
+      {priority:'本週',text:'製作收款缺口清單，業務主管負責追蹤'},
+      {priority:'本月',text:'導入 BDC Working Capital Insights 自動追款'},
+    ]};
+    const avgM=PROJECTS.reduce((s,x)=>s+x.margin_cur,0)/PROJECTS.length;
+    return{insights:[
+      {type:rd.length>3?'critical':'warning',icon:'📊',title:`組合概覽：${rd.length} 高風險 / ${PROJECTS.filter(x=>x.rag==='A').length} 注意`,badge:'overview',
+        body:`合約總額：${(PROJECTS.reduce((s,x)=>s+x.contract,0)/1000).toFixed(1)} 億\n平均毛利率：${avgM.toFixed(1)}%\nEAC超合約：${PROJECTS.filter(x=>x.eac_bcms>=x.contract*0.97).length} 個`},
+      {type:'warning',icon:'🔍',title:'最需關注前 3 案',badge:'priority',
+        body:PROJECTS.filter(x=>x.rag==='R').sort((a,b)=>a.margin_cur-b.margin_cur).slice(0,3).map(x=>`• ${x.id}：毛利 ${x.margin_cur.toFixed(1)}%`).join('\n')},
+      {type:'info',icon:'✦',title:'建議進一步詢問',badge:'tip',body:`• 毛利下滑超過 5pp 的案子\n• 風險準備金膨脹最嚴重前 5 案\n• 收款落後超過 10pp 的專案`},
+    ],actions:[
+      {priority:'立即',text:`處理 ${rd.length} 個高風險案`},
+      {priority:'本週',text:'追催收款落後案的應收帳款'},
+      {priority:'本月',text:'建立自動化月報流程'},
+    ]};
+  }
+  // Single project
+  const rm=(p.risk_cur/p.risk_base).toFixed(1);
+  if(q.includes('主因')||q.includes('毛利'))return{insights:[
+    {type:p.margin_cur<8?'critical':'warning',icon:'💰',title:`毛利 ${p.margin_cur.toFixed(1)}%，較成案低 ${(p.margin_base-p.margin_cur).toFixed(1)}pp`,badge:'deviation',
+      body:`成案 ${p.margin_base.toFixed(1)}% → 現行 ${p.margin_cur.toFixed(1)}%\n會計 EAC 較合約高 ${(p.eac_acc-p.contract).toFixed(0)} M`},
+    {type:'critical',icon:'📦',title:'發包超控為最大成本風險',badge:'root cause',
+      body:`發包 Budget：${p.sub_budget.toFixed(0)} M → 累計：${p.sub_actual.toFixed(0)} M\n執行率 ${(p.sub_actual/p.sub_budget*100).toFixed(0)}% vs 自評 ${p.self_pct.toFixed(1)}%`},
+    {type:'info',icon:'✦',title:`完工毛利預測：${(p.margin_cur-0.5).toFixed(1)}% ~ ${(p.margin_cur+1.5).toFixed(1)}%`,badge:'AI forecast',
+      body:`樂觀：${(p.margin_cur+1.5).toFixed(1)}%（發包議價成功）\n基準：${(p.margin_cur-0.5).toFixed(1)}%（現況）\n悲觀：${(p.margin_cur-2.5).toFixed(1)}%（風險金全啟用）`},
+  ],actions:[
+    {priority:'立即',text:'召集 PM + 採購審查發包超控項目'},
+    {priority:'本週',text:'更新 EAC，確認 SE&C 是否充分反映'},
+    {priority:'本月',text:'評估向客戶提出變更追加（Change Order）'},
+  ]};
+  return{insights:[
+    {type:p.rag==='R'?'critical':p.rag==='A'?'warning':'positive',icon:'📊',
+      title:`${p.id} 綜合健康評估`,badge:p.rag==='R'?'critical':p.rag==='A'?'warning':'normal',
+      body:`毛利率：${p.margin_cur.toFixed(1)}% | 進度：${p.self_pct.toFixed(0)}%\n收款：${p.billed_pct.toFixed(0)}% | 風險金：${(p.risk_cur/p.risk_base).toFixed(1)}×`},
+    {type:'info',icon:'✦',title:'建議進一步詢問',badge:'tip',
+      body:`• 毛利下滑主因分析\n• 發包進度風險\n• 預測完工毛利率`},
+  ],actions:[
+    {priority:'本週',text:'確認本案最新 EAC 狀態'},
+    {priority:'本月',text:'追蹤主要 KPI 變化趨勢'},
+  ]};
+}
+
+async function runGenie(){
+  const query=document.getElementById('genieInput').value.trim();
+  if(!query)return;
+  const btn=document.getElementById('genieSendBtn');
+  btn.disabled=true;
+  document.getElementById('genieLoading').classList.add('show');
+  document.getElementById('genieResultWrap').classList.remove('show');
+  document.getElementById('genieSqlWrap').classList.remove('show');
+  const steps=['解析自然語言…','生成 SQL…','查詢 Unity Catalog…','ML 模型推論…','生成洞察…'];
+  let si=0;
+  const t=setInterval(()=>{
+    if(si<steps.length){
+      document.getElementById('genieLoadingText').textContent=steps[si];
+      document.getElementById('genieLoadingSteps').textContent=`${si+1} / ${steps.length}`;
+      si++;
+    }
+  },300);
+  await new Promise(r=>setTimeout(r,1700));
+  clearInterval(t);
+  document.getElementById('genieSqlCode').textContent=generateSQL(query,genieCurrentProject);
+  document.getElementById('genieSqlWrap').classList.add('show');
+  const sc=document.getElementById('genieSqlCode'); if(sc) sc.style.display='none';
+  const st=document.getElementById('genieSqlToggle'); if(st) st.textContent='▼ 展開';
+  const result=analyzeQuery(query,genieCurrentProject);
+  const wrap=document.getElementById('genieResultWrap');
+  wrap.innerHTML=`
+    <div class="genie-section-title">AI Insights</div>
+    ${result.insights.map(i=>`<div class="insight-card ${i.type}">
+      <div class="insight-title">${i.icon} ${i.title}
+        <span class="insight-badge badge-${i.type}">${i.badge}</span></div>
+      <div class="insight-body" style="white-space:pre-line">${i.body}</div></div>`).join('')}
+    <div class="genie-section-title">Recommended Actions</div>
+    ${result.actions.map((a,i)=>`<div class="action-item">
+      <div class="action-num">${i+1}</div>
+      <div class="action-text">${a.text}
+        <span class="action-tag ${a.priority==='立即'?'tag-now':a.priority==='本週'?'tag-week':'tag-month'}">${a.priority}</span>
+      </div></div>`).join('')}
+    <div style="margin-top:12px;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);
+      font-size:10px;color:var(--cyan);letter-spacing:1px;border-radius:2px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <img src="sap_logo.png" alt="SAP" style="height:20px;border-radius:2px;opacity:.9;">
+        <span style="font-size:12px;font-weight:700;color:#00A0E0;letter-spacing:.5px;">SAP Business Data Cloud</span>
+      </div>
+      ✦ POWERED BY DATABRICKS GENIE · Text-to-SQL on Unity Catalog<br>
+      <span style="color:var(--muted)">Data via SAP BDC · BCMS + ACC577 + MIS unified data fabric</span>
+    </div>`;
+  document.getElementById('genieLoading').classList.remove('show');
+  wrap.classList.add('show');
+  btn.disabled=false;
+}
+
+function toggleSql(){
+  const code   = document.getElementById('genieSqlCode');
+  const toggle = document.getElementById('genieSqlToggle');
+  if(!code||!toggle) return;
+  const isOpen = code.style.display !== 'none';
+  code.style.display   = isOpen ? 'none' : 'block';
+  toggle.textContent   = isOpen ? '▼ 展開' : '▲ 收合';
+}
+function copySql(){navigator.clipboard?.writeText(document.getElementById('genieSqlCode').textContent);}
+
+/* ── AI HEALTH REPORT ─────────────────────────── */
+let reportProject = null;
+
+function openReportModal(){
+  if(!reportProject) return;
+  document.getElementById('modal-proj-title').textContent =
+    reportProject.id.trim()+' — '+reportProject.name;
+  document.getElementById('report-modal-overlay').style.display='block';
+  const modal=document.getElementById('report-modal');
+  modal.style.display='flex';
+  const out=document.getElementById('report-output');
+  const ph=document.getElementById('report-placeholder');
+  if(!out.classList.contains('show')){
+    ph.style.display='block';
+    out.style.display='none';
+  }
+}
+
+function closeReportModal(){
+  document.getElementById('report-modal-overlay').style.display='none';
+  document.getElementById('report-modal').style.display='none';
+}
+
+async function generateHealthReport(){
+  if(!reportProject) return;
+  const p = reportProject;
+  const btn = document.getElementById('report-gen-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中…';
+
+  // reset
+  document.getElementById('report-output').classList.remove('show');
+  [1,2,3,4,5,6].forEach(i=>{
+    const el=document.getElementById('flow-'+i);
+    el.classList.remove('active','done');
+  });
+
+  // 逐步執行流程動畫
+  const steps = [
+    {id:'flow-1', label:'📥 收集 POMS + SAP ERP 數據…', ms:600},
+    {id:'flow-2', label:'🔍 交叉分析 6 大指標偏差…',   ms:700},
+    {id:'flow-3', label:'💡 AI 根因推論中…',            ms:800},
+    {id:'flow-4', label:'📝 生成行動方案…',              ms:600},
+    {id:'flow-5', label:'📄 撰寫報告備註欄…',            ms:500},
+    {id:'flow-6', label:'🔔 設定持續追蹤警示…',          ms:400},
+  ];
+
+  for(let i=0;i<steps.length;i++){
+    const s=steps[i];
+    document.getElementById(s.id).classList.add('active');
+    btn.textContent = s.label;
+    await new Promise(r=>setTimeout(r,s.ms));
+    document.getElementById(s.id).classList.remove('active');
+    document.getElementById(s.id).classList.add('done');
+  }
+
+  // 計算所有指標
+  const md = (p.margin_cur - p.margin_base).toFixed(1);
+  const pd = (p.cost_pct - p.self_pct).toFixed(1);
+  const rm = (p.risk_cur / p.risk_base).toFixed(1);
+  const subRatio = (p.sub_actual/p.sub_budget*100).toFixed(1);
+  const billingLag = (p.complete_pct - p.billed_pct).toFixed(1);
+  const mColor = p.margin_cur<8?'#FF3D3D':p.margin_cur<11?'#FFB300':'#00E676';
+  const overall = p.rag==='R'?'🔴 高風險 — 需立即介入':p.rag==='A'?'🟡 注意 — 持續追蹤':'🟢 正常 — 維持現況';
+
+  // ── 專案狀況摘要 ──
+  document.getElementById('rb-summary-body').innerHTML = `
+    <strong>整體評估：</strong>${overall}<br>
+    本案目前工期進度 <strong style="color:#00FFFF">${p.schedule_pct.toFixed(1)}%</strong>，
+    成本進度 <strong style="color:var(--orange)">${p.cost_pct.toFixed(1)}%</strong>，
+    自評進度 <strong style="color:var(--amber)">${p.self_pct.toFixed(1)}%</strong>。<br><br>
+    現行毛利率 <strong style="color:${mColor}">${p.margin_cur.toFixed(1)}%</strong>，
+    較成案目標 ${p.margin_base.toFixed(1)}% 偏差
+    <strong style="color:${+md<0?'#FF3D3D':'#00E676'}">${md}pp</strong>。<br>
+    合約總額 <strong style="color:#00FFFF">${p.contract.toFixed(0)} M</strong>，
+    累計認列營收 <strong>${p.revenue_acc.toFixed(0)} M</strong>，
+    完工比例 <strong>${p.complete_pct.toFixed(1)}%</strong>。`;
+
+  // ── 異常偏差分析 ──
+  const deviations = [];
+  if(Math.abs(+pd)>2) deviations.push(`成本進度 vs 自評進度偏差 <strong style="color:#FFB300">${pd}pp</strong>，成本消耗超出實體進度`);
+  if(+billingLag>8)   deviations.push(`收款落後完工進度 <strong style="color:#FF3D3D">${billingLag}pp</strong>（完工 ${p.complete_pct.toFixed(1)}% vs 收款 ${p.billed_pct.toFixed(1)}%）`);
+  if(+rm>5)           deviations.push(`風險準備金膨脹 <strong style="color:#FF3D3D">${rm}×</strong>（成案 ${(p.risk_base/100).toFixed(0)} 萬 → 現行 ${(p.risk_cur/100).toFixed(0)} 萬）`);
+  if(+subRatio < p.self_pct-10) deviations.push(`發包執行率 <strong style="color:#FFB300">${subRatio}%</strong> 遠低於自評進度 ${p.self_pct.toFixed(1)}%`);
+  if(p.eac_bcms >= p.contract*0.97) deviations.push(`EAC <strong style="color:#FF3D3D">${p.eac_bcms.toFixed(0)} M</strong> 已逼近合約金額 ${p.contract.toFixed(0)} M`);
+  if(deviations.length===0) deviations.push('✅ 各項指標均在正常範圍內，無顯著偏差');
+  document.getElementById('rb-deviation-body').innerHTML = deviations.map(d=>`• ${d}`).join('<br>');
+
+  // ── 根因分析 ──
+  const causes = [];
+  if(+rm>5)           causes.push(`SE&C 風險準備金膨脹：工程設計變更頻繁或發包廠商績效未達標，導致額外成本介入`);
+  if(+subRatio<p.self_pct-10) causes.push(`發包計價落後：施工進度推進但廠商計價申請延遲，或工作範疇認定存在爭議`);
+  if(+billingLag>8)   causes.push(`請款缺口：里程碑驗收文件未及時送件，或客戶審核週期較預期長`);
+  if(+pd>3)           causes.push(`成本超前進度：前期管理成本或間接費用超出計畫，實體進度尚未跟上`);
+  if(causes.length===0) causes.push('各項指標健康，建議維持現有執行節奏並定期複查');
+  document.getElementById('rb-rootcause-body').innerHTML = causes.map((c,i)=>`${i+1}. ${c}`).join('<br><br>');
+
+  // ── 預警通知 ──
+  const warns = [];
+  if(p.margin_cur < p.margin_base - 2) warns.push({level:'🔴',text:`毛利率已下滑 ${Math.abs(+md).toFixed(1)}pp，若未介入預測完工毛利 ${(p.margin_cur-1.5).toFixed(1)}%`});
+  if(+rm>10) warns.push({level:'🔴',text:`風險準備金膨脹 ${rm}×，SE&C 金額 ${(p.risk_cur/100).toFixed(0)} 萬已超警戒`});
+  if(+billingLag>10) warns.push({level:'🟡',text:`收款落後 ${billingLag}pp，資金成本每月約 ${(Math.abs(p.billing_gap)*0.03/12).toFixed(1)} M`});
+  if(p.schedule_pct>80 && p.self_pct < p.schedule_pct-10) warns.push({level:'🟡',text:`工期已達 ${p.schedule_pct.toFixed(0)}%，但自評進度僅 ${p.self_pct.toFixed(1)}%，尾期壓縮風險高`});
+  if(warns.length===0) warns.push({level:'🟢',text:'目前無重大預警，建議下月繼續追蹤毛利率趨勢'});
+  document.getElementById('rb-warning-body').innerHTML = warns.map(w=>`${w.level} ${w.text}`).join('<br><br>');
+
+  // ── 行動方案 ──
+  const actions = [];
+  if(p.rag==='R' || +md < -3) actions.push({t:'now', text:`召開 ${p.id.trim()} 緊急 EAC Review，PM ${p.pm} 主持，更新損益預測`});
+  if(+billingLag>8) actions.push({t:'now', text:`本週送出所有待開發票，目標追回收款缺口 ${Math.abs(p.billing_gap).toFixed(0)} M`});
+  if(+rm>5) actions.push({t:'week', text:`召集採購審查 SE&C 逐項，確認是否已充分反映在 EAC`});
+  if(+subRatio < p.self_pct-10) actions.push({t:'week', text:`清查發包計價落後項目，確認廠商是否有履約困難或爭議`});
+  actions.push({t:'month', text:`下次月結前完成本案健康報告更新，提交 CEO 月報`});
+  actions.push({t:'month', text:`設定 EAC/合約金額 ≥ 97% 自動預警，納入 SAP BDC 監控`});
+
+  document.getElementById('rb-actions').innerHTML = actions.map(a=>`
+    <div class="action-row">
+      <span class="action-badge ${a.t==='now'?'badge-now':a.t==='week'?'badge-week':'badge-month'}">
+        ${a.t==='now'?'立即':a.t==='week'?'本週':'本月'}
+      </span>
+      <span class="action-row-text">${a.text}</span>
+    </div>`).join('');
+
+  // ── 持續追蹤 ──
+  const targets = [
+    {label:'毛利率目標', val:`≥ ${(p.margin_cur+1).toFixed(1)}%`, sub:'下月目標', color:mColor},
+    {label:'收款比例', val:`≥ ${Math.min(p.billed_pct+5, 100).toFixed(1)}%`, sub:'下月追蹤', color:'#00FFFF'},
+    {label:'發包執行率', val:`≥ ${Math.min(+subRatio+8, 100).toFixed(0)}%`, sub:'下月目標', color:'#FFB300'},
+    {label:'風險準備金', val:`≤ ${(p.risk_cur/100*0.95).toFixed(0)} 萬`, sub:'控制目標', color:'#00E676'},
+  ];
+  document.getElementById('rb-track').innerHTML = targets.map(t=>`
+    <div class="track-item">
+      <div class="track-label">${t.label}</div>
+      <div class="track-val" style="color:${t.color}">${t.val}</div>
+      <div class="track-sub">${t.sub}</div>
+    </div>`).join('');
+
+  // 時間戳
+  const now = new Date();
+  document.getElementById('report-timestamp').textContent =
+    `生成時間：${now.toLocaleDateString('zh-TW')} ${now.toLocaleTimeString('zh-TW',{hour12:false})} · SAP Business AI`;
+
+  document.getElementById('report-output').classList.add('show');
+  document.getElementById('report-output').style.display='block';
+  const ph=document.getElementById('report-placeholder');if(ph)ph.style.display='none';
+  btn.disabled = false;
+  btn.textContent = '✦ 一鍵生成健康報告';
+  document.getElementById('report-output').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exportReportTxt(){
+  if(!reportProject) return;
+  const p = reportProject;
+  const now = new Date().toLocaleString('zh-TW',{hour12:false});
+  const txt = [
+    `═══════════════════════════════════════════`,
+    `  CTCI ASI 專案健康報告`,
+    `  ${p.id.trim()} — ${p.name}`,
+    `  生成時間：${now}`,
+    `═══════════════════════════════════════════`,
+    ``,
+    `【專案基本資料】`,
+    `  PM：${p.pm}  CSE：${p.cse}  客戶：${p.client}`,
+    `  合約金額：${p.contract.toFixed(0)} M  工期：${p.start} ～ ${p.end}`,
+    ``,
+    `【關鍵指標】`,
+    `  現行毛利率：${p.margin_cur.toFixed(1)}%（成案：${p.margin_base.toFixed(1)}%，偏差：${(p.margin_cur-p.margin_base).toFixed(1)}pp）`,
+    `  工期進度：${p.schedule_pct.toFixed(1)}%  成本進度：${p.cost_pct.toFixed(1)}%  自評進度：${p.self_pct.toFixed(1)}%`,
+    `  完工比例：${p.complete_pct.toFixed(1)}%  收款比例：${p.billed_pct.toFixed(1)}%`,
+    `  風險準備金：${(p.risk_cur/100).toFixed(0)} 萬（${(p.risk_cur/p.risk_base).toFixed(1)}× 成案）`,
+    ``,
+    `【AI 異常偏差摘要】`,
+    document.getElementById('rb-deviation-body').innerText.split('\n').map(l=>'  '+l).join('\n'),
+    ``,
+    `【AI 根因分析】`,
+    document.getElementById('rb-rootcause-body').innerText.split('\n').map(l=>'  '+l).join('\n'),
+    ``,
+    `【AI 建議行動方案】`,
+    document.querySelectorAll('.action-row-text').length>0
+      ? Array.from(document.querySelectorAll('.action-row')).map((r,i)=>{
+          const badge = r.querySelector('.action-badge').innerText.trim();
+          const text  = r.querySelector('.action-row-text').innerText.trim();
+          return `  [${badge}] ${text}`;
+        }).join('\n')
+      : '',
+    ``,
+    `═══════════════════════════════════════════`,
+    `  Powered by SAP Business AI · Databricks Genie`,
+    `═══════════════════════════════════════════`,
+  ].join('\n');
+
+  const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `${p.id.trim()}_健康報告_${now.replace(/[:/\s]/g,'-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyReport(){
+  const out = document.getElementById('report-output');
+  if(!out) return;
+  navigator.clipboard?.writeText(out.innerText);
+  const btn = document.querySelector('.report-export-btn:nth-child(2)');
+  if(btn){ btn.textContent='✓ 已複製'; setTimeout(()=>btn.textContent='⎘ 複製報告',1500); }
+}
+
+
+/* ── COLLAPSIBLE SECTIONS JS ──────────────────── */
+function toggleSection(bodyId, btnId){
+  const body = document.getElementById(bodyId);
+  const btn  = document.getElementById(btnId);
+  if(!body||!btn) return;
+  const collapsed = body.style.display==='none';
+  body.style.display = collapsed ? '' : 'none';
+  btn.textContent   = collapsed ? '▼ 收合' : '▶ 展開';
+  btn.classList.toggle('collapsed', !collapsed);
+}
+
+
+/* ── CASHFLOW FORECAST ─────────────────────────── */
+let cfChart = null;
+
+function renderCashflowChart(){
+  if(cfChart){ try{cfChart.destroy();}catch(e){} cfChart=null; }
+
+  const filter = document.getElementById('cashflow-proj-filter')?.value||'all';
+  const projs  = filter==='all' ? PROJECTS : PROJECTS.filter(p=>p.rag===filter);
+
+  // 13 週預測
+  const weeks=[], inflow=[], outflow=[], netCum=[];
+  let cum=0;
+  const totalGap = projs.reduce((s,p)=>s+Math.abs(p.billing_gap),0);
+  const totalSub  = projs.reduce((s,p)=>s+p.sub_budget*((100-p.self_pct)/100),0);
+  const totalCon  = projs.reduce((s,p)=>s+p.contract,0);
+
+  for(let w=0;w<13;w++){
+    const m = (5+Math.floor(w*7/30))%12+1;
+    const d = (31+w*7)%28+1;
+    weeks.push(`${m}/${d<10?'0'+d:d}`);
+
+    const milestone = w===2?totalCon*0.018:w===5?totalCon*0.025:w===9?totalCon*0.02:0;
+    const inf = +(totalGap/13 + milestone + Math.sin(w*0.9)*(totalGap/13)*0.25).toFixed(1);
+    inflow.push(Math.max(0, inf));
+
+    const out = +(totalSub/13*(1+Math.cos(w*0.6)*0.2)).toFixed(1);
+    outflow.push(Math.max(0, out));
+
+    cum += inflow[w] - outflow[w];
+    netCum.push(+cum.toFixed(1));
+  }
+
+  // canvas 強制填滿容器
+  const canvas = document.getElementById('pf-cashflow');
+  const body   = document.getElementById('cashflow-body');
+  if(canvas && body){
+    canvas.style.width  = '100%';
+  }
+
+  cfChart = new Chart(canvas, {
+    type:'bar',
+    data:{
+      labels: weeks,
+      datasets:[
+        { type:'bar', label:'預計收款', data:inflow,
+          backgroundColor:'rgba(0,230,118,.5)', borderColor:'rgba(0,230,118,.8)',
+          borderWidth:1, borderRadius:2, borderSkipped:false, yAxisID:'y' },
+        { type:'bar', label:'預計支出', data:outflow.map(v=>-v),
+          backgroundColor:'rgba(255,61,61,.45)', borderColor:'rgba(255,61,61,.7)',
+          borderWidth:1, borderRadius:2, borderSkipped:false, yAxisID:'y' },
+        { type:'line', label:'淨現金（累計）', data:netCum,
+          borderColor:'rgba(0,229,255,.9)', backgroundColor:'rgba(0,229,255,.06)',
+          borderWidth:2.5, borderDash:[5,3],
+          pointBackgroundColor:netCum.map(v=>v>=0?'#00E676':'#FF3D3D'),
+          pointRadius:3, fill:true, tension:.4, yAxisID:'y2' },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>`  ${c.dataset.label}: ${Math.abs(c.raw).toFixed(1)} M`}}
+      },
+      scales:{
+        x:{ grid:{color:'rgba(0,229,255,.06)'}, ticks:{color:'#8BAAC8',font:{size:10,family:"'Arial'"}} },
+        y:{ grid:{color:'rgba(0,229,255,.06)'},
+            ticks:{color:'#8BAAC8',font:{size:10},callback:v=>Math.abs(v).toFixed(0)+'M'},
+            title:{display:true,text:'收/支 M',color:'#8BAAC8',font:{size:10}} },
+        y2:{ position:'right', grid:{display:false},
+             ticks:{color:'#00E5FF',font:{size:10},callback:v=>v.toFixed(0)+'M'},
+             title:{display:true,text:'累計淨額 M',color:'#00E5FF',font:{size:10}} },
+      }
+    },
+    plugins:[{
+      id:'zeroLine',
+      afterDraw(chart){
+        const{ctx,scales:{y,x}}=chart;
+        const yp=y.getPixelForValue(0);
+        ctx.save(); ctx.setLineDash([4,3]);
+        ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x.left,yp); ctx.lineTo(x.right,yp); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+      }
+    }]
+  });
+
+  // 摘要數字
+  const tIn  = inflow.reduce((s,v)=>s+v,0).toFixed(0);
+  const tOut = outflow.reduce((s,v)=>s+v,0).toFixed(0);
+  const net  = netCum[netCum.length-1].toFixed(0);
+  const peak = inflow.indexOf(Math.max(...inflow))+1;
+  const neg  = netCum.filter(v=>v<0).length;
+  const nc   = +net>=0?'#00E676':'#FF3D3D';
+
+  document.getElementById('cashflow-summary').innerHTML=[
+    {l:'90天預計收款',  v:`${tIn} M`,  c:'#00E676'},
+    {l:'90天預計支出',  v:`${tOut} M`, c:'#FF3D3D'},
+    {l:'淨現金流（90天）',v:`${+net>=0?'+':''}${net} M`, c:nc},
+    {l:'收款高峰週',    v:`第 ${peak} 週`, c:'#FFB300'},
+    {l:'現金負數週數',  v:`${neg} 週`,  c:neg>3?'#FF3D3D':neg>0?'#FFB300':'#00E676'},
+  ].map(({l,v,c})=>`
+    <div style="background:rgba(0,0,0,.3);border:1px solid rgba(0,229,255,.12);border-radius:3px;padding:8px 10px;text-align:center;">
+      <div style="font-size:10px;color:#8BAAC8;margin-bottom:4px;">${l}</div>
+      <div style="font-size:15px;font-weight:700;font-family:'Arial';color:${c};">${v}</div>
+    </div>`).join('');
+
+  const sub=document.getElementById('cashflow-sub');
+  if(sub) sub.textContent=`${filter==='all'?'全部 '+PROJECTS.length+' 案':filter==='R'?'高風險案':filter==='A'?'注意案':'正常案'}  ·  預計收款 ${tIn}M  ·  預計支出 ${tOut}M  ·  90天淨額 ${+net>=0?'+':''}${net}M`;
+}
+
+
+
+
+
+/* ── FLOATING NAV JS ─────────────────────────── */
+function navTo(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  // highlight active
+  document.querySelectorAll('.float-nav-btn').forEach(b=>b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+function showFloatNav(){ document.getElementById('detail-float-nav').style.display='flex'; }
+function hideFloatNav(){ document.getElementById('detail-float-nav').style.display='none'; }
+
+// 滾動時更新 active 狀態
+function updateNavActive(){
+  const sections = [
+    {id:'d-kpi-section',   idx:0},
+    {id:'row1-section',    idx:1},
+    {id:'row2-section',    idx:2},
+    {id:'row3-section',    idx:3},
+    {id:'cost-drill-section', idx:4},
+    {id:'diag-section',    idx:5},
+    {id:'pm-section',      idx:6},
+  ];
+  const btns = document.querySelectorAll('.float-nav-btn');
+  let current = 0;
+  sections.forEach(s=>{
+    const el = document.getElementById(s.id);
+    if(el && el.getBoundingClientRect().top <= 120) current = s.idx;
+  });
+  btns.forEach((b,i)=>b.classList.toggle('active', i===current));
+}
+window.addEventListener('scroll', updateNavActive, {passive:true});
+
+/* ── PM COMMENT MECHANISM ───────────────────── */
+const PM_STORAGE_KEY = 'ctci_pm_comments';
+
+function loadComments(){
+  try{ return JSON.parse(localStorage.getItem(PM_STORAGE_KEY)||'{}'); }
+  catch(e){ return {}; }
+}
+function saveComment(projId, triggerKey, text){
+  const all = loadComments();
+  if(!all[projId]) all[projId]={};
+  if(!all[projId][triggerKey]) all[projId][triggerKey]=[];
+  all[projId][triggerKey].unshift({
+    text, ts: new Date().toLocaleString('zh-TW',{hour12:false})
+  });
+  // 只保留最近 5 筆
+  all[projId][triggerKey] = all[projId][triggerKey].slice(0,5);
+  localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(all));
+}
+function exportComments(){
+  const data = loadComments();
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'ctci_pm_comments_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importComments(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(data));
+      alert('匯入成功！請重新點選專案查看紀錄。');
+    }catch(err){ alert('匯入失敗：JSON 格式錯誤'); }
+  };
+  reader.readAsText(file);
+}
+
+function renderPMComments(p){
+  const stored = loadComments();
+  const projComments = stored[p.id] || {};
+
+  // ── 六大觸發條件 ──────────────────────────────
+  const triggers = [];
+
+  // T1: 成本差大（認列成本差異 > 10%）
+  const costBcmsEst = p.cost_pct/100 * p.contract_budget;
+  const costDiffPct = Math.abs(p.cost_acc - costBcmsEst) / Math.max(costBcmsEst,1) * 100;
+  if(costDiffPct > 10) triggers.push({
+    key:'T1_cost_diff',
+    severity:'critical',
+    icon:'⚠',
+    label:'成本差異過大（需 PM 說明）',
+    val: (p.cost_acc-costBcmsEst>=0?'+':'')+( p.cost_acc-costBcmsEst).toFixed(1)+' M（'+costDiffPct.toFixed(1)+'%）',
+    valColor:'#FF3D3D',
+    placeholder:'請說明認列成本與 BCMS 成本差異的原因，以及改善計畫...',
+  });
+
+  // T2: 進度差大（成本進度 - 自評進度 > 8pp）
+  const progDiff = p.cost_pct - p.self_pct;
+  if(Math.abs(progDiff) > 8) triggers.push({
+    key:'T2_prog_diff',
+    severity: progDiff > 0 ? 'critical' : 'warning',
+    icon:'📉',
+    label:`進度落後說明（成本 vs 自評差 ${Math.abs(progDiff).toFixed(1)}pp，需 PM 說明）`,
+    val: (progDiff>=0?'+':'')+progDiff.toFixed(1)+'pp',
+    valColor: progDiff > 0 ? '#FF3D3D' : '#FFB300',
+    placeholder:'請說明進度落後的具體原因，以及預計趕工計畫...',
+  });
+
+  // T3: 應請未請（收款缺口 < -5M）
+  if(p.billing_gap < -5) triggers.push({
+    key:'T3_billing',
+    severity:'warning',
+    icon:'💳',
+    label:`應請未請金額過大（${p.billing_gap.toFixed(1)} M，需 PM 說明）`,
+    val: p.billing_gap.toFixed(1)+' M',
+    valColor:'#FFB300',
+    placeholder:'請說明尚未請款的原因（如：驗收文件未備齊、客戶審核中...），以及預計送件時程...',
+  });
+
+  // T4: 人員成本差大（工時實際 > Budget 15%）
+  const mhOverPct = (p.mh_actual - p.mh_budget) / Math.max(p.mh_budget,1) * 100;
+  if(mhOverPct > 15) triggers.push({
+    key:'T4_mh_over',
+    severity:'critical',
+    icon:'👷',
+    label:`人員成本超支（工時超 ${mhOverPct.toFixed(0)}%，需 PM 說明及改善方法）`,
+    val: '實際 '+(p.mh_actual/1000).toFixed(1)+'K MH vs Budget '+(p.mh_budget/1000).toFixed(1)+'K MH',
+    valColor:'#FF3D3D',
+    placeholder:'請說明人工工時超支原因，以及後續人力管控改善措施...',
+  });
+
+  // T5: 外包比例過大（發包實際 > 直接成本總額 60%）
+  const totalDirect = p.mat_actual + p.sub_actual + p.mh_actual/1000;
+  const subRatio = totalDirect > 0 ? p.sub_actual / totalDirect * 100 : 0;
+  if(subRatio > 60) triggers.push({
+    key:'T5_sub_ratio',
+    severity:'warning',
+    icon:'🏗',
+    label:`外包比例過高（${subRatio.toFixed(0)}% > 60%，需 PM 說明原因及改善方法）`,
+    val: '發包 '+p.sub_actual.toFixed(1)+'M / 直接成本 '+totalDirect.toFixed(1)+'M = '+subRatio.toFixed(0)+'%',
+    valColor:'#FFB300',
+    placeholder:'請說明外包比例偏高的原因（如：自有人力不足、專業分包需求...），以及是否影響品質管控...',
+  });
+
+  // T6: 進度>90% 但風險準備金仍>70%
+  const riskUsedPct = p.risk_cur / p.risk_base * 100;
+  if(p.schedule_pct > 90 && riskUsedPct > 70) triggers.push({
+    key:'T6_late_risk',
+    severity:'critical',
+    icon:'🛡',
+    label:`尾期風險準備金偏高（工期 ${p.schedule_pct.toFixed(0)}% 但風險金仍 ${riskUsedPct.toFixed(0)}%，需 PM 說明）`,
+    val: `工期 ${p.schedule_pct.toFixed(0)}%，風險準備金 ${(p.risk_cur/100).toFixed(0)}萬（${(p.risk_cur/p.risk_base).toFixed(1)}×）`,
+    valColor:'#FF3D3D',
+    placeholder:'請說明工程進入尾期但風險準備金仍偏高的原因，預計如何使用或釋回...',
+  });
+
+  // ── 無觸發項目時 ──────────────────────────────
+  if(triggers.length === 0){
+    document.getElementById('d-pm-triggers').innerHTML =
+      `<div style="padding:16px 18px;background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);
+        border-radius:4px;font-size:13px;color:var(--green);">
+        ✅ 本案目前無需 PM 說明的異常項目，各指標均在合理範圍內。
+      </div>`;
+    return;
+  }
+
+  // ── 渲染觸發項目 ────────────────────────────
+  document.getElementById('d-pm-triggers').innerHTML = triggers.map(t=>{
+    const history = projComments[t.key] || [];
+    const historyHTML = history.length > 0
+      ? `<div class="pm-history">${history.map(h=>
+          `<div class="pm-history-item">
+            ${h.text}
+            <div class="pm-history-meta">${h.ts}</div>
+          </div>`).join('')}
+        </div>`
+      : `<div style="font-size:11px;color:#8BAAC8;padding:4px 0;">尚無說明紀錄</div>`;
+
+    return `<div class="pm-trigger-item ${t.severity}">
+      <div class="pm-trigger-header">
+        <div class="pm-trigger-label">
+          <span>${t.icon}</span>
+          <span>${t.label}</span>
+        </div>
+        <span class="pm-trigger-val" style="color:${t.valColor}">${t.val}</span>
+      </div>
+      <div style="font-size:10px;color:#8BAAC8;margin-bottom:6px;font-weight:700;">
+        歷史說明紀錄：
+      </div>
+      ${historyHTML}
+      <div style="margin-top:8px;">
+        <div style="font-size:10px;color:#8BAAC8;margin-bottom:4px;font-weight:700;">新增 PM 說明：</div>
+        <textarea class="pm-comment-area" id="pm-input-${t.key}"
+          placeholder="${t.placeholder}"></textarea>
+        <button class="pm-save-btn" onclick="savePMComment('${p.id}','${t.key}')">
+          💾 儲存說明
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function savePMComment(projId, triggerKey){
+  const el = document.getElementById('pm-input-'+triggerKey);
+  if(!el || !el.value.trim()){ alert('請先輸入說明內容'); return; }
+  saveComment(projId, triggerKey, el.value.trim());
+  el.value = '';
+  // 重新渲染
+  const p = PROJECTS.find(x=>x.id===projId);
+  if(p) renderPMComments(p);
+  // 短暫提示
+  const btn = document.querySelector(`[onclick="savePMComment('${projId}','${triggerKey}')"]`);
+  if(btn){ btn.textContent='✓ 已儲存'; setTimeout(()=>btn.textContent='💾 儲存說明',1500); }
+}
+
+/* ── COST DRILLDOWN ──────────────────────────── */
+function renderCostDrilldown(p){
+  const totalBudget  = p.mat_budget + p.sub_budget + (p.mh_budget/1000);
+  const totalActual  = p.mat_actual + p.sub_actual + (p.mh_actual/1000);
+  const totalOverrun = totalActual - totalBudget;
+  const overrunPct   = totalBudget > 0 ? (totalOverrun/totalBudget*100) : 0;
+
+  // ── 摘要 chips ────────────────────────────────
+  const chips = [
+    {label:'直接成本 Budget', val:(totalBudget).toFixed(1)+' M', c:'rgba(0,229,255,.15)', tc:'#00FFFF'},
+    {label:'直接成本 Actual', val:(totalActual).toFixed(1)+' M',
+     c:totalActual>totalBudget?'rgba(255,61,61,.15)':'rgba(0,230,118,.15)',
+     tc:totalActual>totalBudget?'#FF3D3D':'#00E676'},
+    {label:'超支 / 節餘', val:(totalOverrun>=0?'+':'')+totalOverrun.toFixed(1)+' M',
+     c:totalOverrun>0?'rgba(255,61,61,.15)':'rgba(0,230,118,.15)',
+     tc:totalOverrun>0?'#FF3D3D':'#00E676'},
+    {label:'超支率', val:(overrunPct>=0?'+':'')+overrunPct.toFixed(1)+'%',
+     c:Math.abs(overrunPct)>10?'rgba(255,61,61,.15)':Math.abs(overrunPct)>5?'rgba(255,179,0,.15)':'rgba(0,230,118,.15)',
+     tc:Math.abs(overrunPct)>10?'#FF3D3D':Math.abs(overrunPct)>5?'#FFB300':'#00E676'},
+  ];
+  document.getElementById('d-cost-summary-chips').innerHTML = chips.map(c=>
+    `<div class="cost-summary-chip" style="background:${c.c};color:${c.tc};border:1px solid ${c.tc}44;">
+       <span style="font-size:15px;opacity:.75;display:block;margin-bottom:3px;">${c.label}</span>${c.val}
+     </div>`).join('');
+
+  // ── 三大直接成本卡 ────────────────────────────
+  const costCards = [
+    {
+      icon:'👷', title:'人工工時成本',
+      budget: p.mh_budget/1000,
+      actual: p.mh_actual/1000,
+      plan:   p.mh_plan/1000,
+      unit:'K MH',
+      rows:[
+        {label:'Budget（人力）', val:(p.mh_budget/1000).toFixed(1)+'K MH'},
+        {label:'人力計畫',        val:(p.mh_plan/1000).toFixed(1)+'K MH'},
+        {label:'累計實際',        val:(p.mh_actual/1000).toFixed(1)+'K MH',
+         diff: p.mh_actual - p.mh_budget},
+        {label:'執行率（vs Budget）', val:((p.mh_actual/Math.max(p.mh_budget,1))*100).toFixed(1)+'%',
+         diff: p.mh_actual - p.mh_budget},
+      ],
+    },
+    {
+      icon:'📦', title:'材料採購成本',
+      budget: p.mat_budget,
+      actual: p.mat_actual,
+      plan:   p.mat_budget * p.self_pct/100,
+      unit:'M TWD',
+      rows:[
+        {label:'Budget', val:p.mat_budget.toFixed(1)+' M'},
+        {label:'按進度應達', val:(p.mat_budget*p.self_pct/100).toFixed(1)+' M'},
+        {label:'累計實際', val:p.mat_actual.toFixed(1)+' M',
+         diff: p.mat_actual - p.mat_budget},
+        {label:'執行率（vs Budget）', val:((p.mat_actual/Math.max(p.mat_budget,1))*100).toFixed(1)+'%',
+         diff: p.mat_actual - p.mat_budget},
+      ],
+    },
+    {
+      icon:'🏗', title:'外包發包成本',
+      budget: p.sub_budget,
+      actual: p.sub_actual,
+      plan:   p.sub_budget * p.self_pct/100,
+      unit:'M TWD',
+      rows:[
+        {label:'Budget', val:p.sub_budget.toFixed(1)+' M'},
+        {label:'按進度應達', val:(p.sub_budget*p.self_pct/100).toFixed(1)+' M'},
+        {label:'累計計價', val:p.sub_actual.toFixed(1)+' M',
+         diff: p.sub_actual - p.sub_budget*p.self_pct/100},
+        {label:'發包執行率', val:((p.sub_actual/Math.max(p.sub_budget,1))*100).toFixed(1)+'%',
+         diff: p.sub_actual - p.sub_budget*p.self_pct/100},
+      ],
+    },
+  ];
+
+  document.getElementById('d-cost-drill-grid').innerHTML = costCards.map(c=>{
+    const overrun = c.actual - c.budget;
+    const overPct = c.budget > 0 ? overrun/c.budget*100 : 0;
+    const cardCls = overPct > 10 ? 'over' : overPct > 5 ? 'warn' : 'ok';
+    const barPct  = Math.min(c.actual/Math.max(c.budget,0.01)*100, 150);
+    const barColor = overPct > 10 ? '#FF3D3D' : overPct > 5 ? '#FFB300' : '#00E676';
+
+    const rowsHTML = c.rows.map(r=>{
+      let cls = 'neutral';
+      if(r.diff !== undefined){
+        cls = r.diff > c.budget*0.05 ? 'over' : r.diff > 0 ? 'warn' : 'ok';
+      }
+      return `<div class="cost-row">
+        <span class="cost-row-label">${r.label}</span>
+        <span class="cost-row-val ${cls}">${r.val}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="cost-card ${cardCls}">
+      <div class="cost-card-title">${c.icon} ${c.title}
+        <span style="margin-left:auto;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;
+          background:${cardCls==='over'?'rgba(255,61,61,.15)':cardCls==='warn'?'rgba(255,179,0,.15)':'rgba(0,230,118,.12)'};
+          color:${barColor};">
+          ${overrun>=0?'+':''}${overrun.toFixed(1)} M
+        </span>
+      </div>
+      ${rowsHTML}
+      <div class="cost-bar-wrap">
+        <div class="cost-bar-label">
+          <span>執行進度</span>
+          <span style="color:${barColor}">${barPct.toFixed(0)}%</span>
+        </div>
+        <div class="cost-bar-bg">
+          <div class="cost-bar-fill" style="width:${Math.min(barPct,100)}%;background:${barColor};"></div>
+          ${barPct>100?`<div class="cost-bar-over" style="width:${Math.min(barPct-100,50)}%;"></div>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── 間接成本分攤（估算）────────────────────────
+  const indirectRate  = 0.12; // 約 12% 間接成本率（估算）
+  const indirectTotal = p.cost_acc * indirectRate;
+  const mgmtFee       = +(indirectTotal * 0.35).toFixed(1);
+  const equipDepreciation = +(indirectTotal * 0.25).toFixed(1);
+  const adminOH       = +(indirectTotal * 0.28).toFixed(1);
+  const otherOH       = +(indirectTotal * 0.12).toFixed(1);
+  const indirectBudget = p.contract_budget * indirectRate;
+  const indirectOverrun = indirectTotal - indirectBudget;
+
+  document.getElementById('d-indirect-section').innerHTML = `
+    <div class="indirect-title">
+      📋 間接成本分攤（估算）
+      <span style="font-size:10px;color:#8BAAC8;font-weight:400;margin-left:8px;">
+        基於 ACC577 累計成本 × 間接成本率 ~${(indirectRate*100).toFixed(0)}%
+      </span>
+      <span style="margin-left:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;
+        background:${indirectOverrun>0?'rgba(255,61,61,.15)':'rgba(0,230,118,.12)'};
+        color:${indirectOverrun>0?'#FF3D3D':'#00E676'};">
+        合計 ${indirectTotal.toFixed(1)} M  ${indirectOverrun>=0?'(超 '+indirectOverrun.toFixed(1)+'M)':'(節 '+(-indirectOverrun).toFixed(1)+'M)'}
+      </span>
+    </div>
+    <div class="indirect-grid">
+      <div class="indirect-item">
+        <div class="indirect-item-label">管理費用分攤</div>
+        <div class="indirect-item-val" style="color:#00FFFF">${mgmtFee} M</div>
+      </div>
+      <div class="indirect-item">
+        <div class="indirect-item-label">設備折舊分攤</div>
+        <div class="indirect-item-val" style="color:#00FFFF">${equipDepreciation} M</div>
+      </div>
+      <div class="indirect-item">
+        <div class="indirect-item-label">行政管理費</div>
+        <div class="indirect-item-val" style="color:#00FFFF">${adminOH} M</div>
+      </div>
+      <div class="indirect-item">
+        <div class="indirect-item-label">其他間接成本</div>
+        <div class="indirect-item-val" style="color:#00FFFF">${otherOH} M</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:13px;color:#8BAAC8;padding:6px 8px;background:rgba(0,229,255,.04);border-radius:3px;border-left:2px solid rgba(0,229,255,.3);">
+      ⚠ 間接成本為估算值，實際數字需連接 SAP CO 模組（sap_co_actual_cost_posting）取得精確分攤明細。
+    </div>`;
+}
+
+/* ── AUTO DIAGNOSIS ──────────────────────────── */
+function renderDiagnostics(p){
+  // 用現有欄位計算 BCMS 累計成本（cost_pct * contract_budget）
+  const cost_bcms_est = p.cost_pct / 100 * p.contract_budget;
+
+  const cards = [];
+
+  /* D1: 成案毛利率（永遠顯示）*/
+  {
+    const likelySysError = p.margin_base < -20;
+    const isNeg = p.margin_base < 0;
+    const isLow = p.margin_base >= 0 && p.margin_base < 8;
+    const cls   = likelySysError ? 'd-warning' : isNeg ? 'd-critical' : isLow ? 'd-warning' : 'd-ok';
+    const badge = likelySysError ? 'warning'   : isNeg ? 'critical'   : isLow ? 'warning'   : 'ok';
+    const badgeText = likelySysError ? '⚠ 可能資料錯誤'
+                    : isNeg          ? '🔴 成案毛利為負'
+                    : isLow          ? '⚠ 成案毛利偏低'
+                    :                  '✓ 成案毛利正常';
+    const color = likelySysError ? '#FFB300' : isNeg ? '#FF3D3D' : isLow ? '#FFB300' : '#00E676';
+    cards.push({
+      cls, badge, badgeText,
+      title: 'D1  成案毛利率基準',
+      value: p.margin_base.toFixed(2)+'%',
+      valueSub: `成案目標 ${p.margin_base.toFixed(2)}%  ·  現行 ${p.margin_cur.toFixed(2)}%  ·  偏差 ${(p.margin_cur-p.margin_base).toFixed(2)}pp`,
+      color,
+      sysWarn: likelySysError ? '數值低於 −20%，請先確認 BCMS Baseline 資料是否正確輸入' : null,
+      reasons: likelySysError
+        ? ['Baseline EAC 可能輸入有誤','成案審批資料尚未更新至系統']
+        : isNeg
+          ? ['成案評估過於樂觀，合約價格偏低','競標時蓄意壓低報價，期待追加','範疇低估導致預算嚴重不足']
+          : isLow
+            ? ['合約金額偏低，利潤空間不足','競標策略激進，風險準備金預留不足','建議在月報中密切追蹤毛利趨勢']
+            : ['成案毛利率在合理範圍，執行過程中仍需維持','注意與現行毛利的差距變化'],
+      actions: likelySysError
+        ? ['聯繫 PM 核對原始成案審批文件','在 BCMS 核對 Baseline EAC 輸入值','暫標記為資料品質問題待確認']
+        : isNeg
+          ? ['召開專案損益評估會','評估向客戶提出 Change Order','啟動高風險專案監控機制']
+          : isLow
+            ? ['加強成本管控，避免毛利進一步侵蝕','每月追蹤 EAC 變化，提早預警']
+            : ['維持現有執行品質','每月確認實際毛利未偏離成案目標'],
+    });
+  }
+
+  /* D2: 進度差（成本進度 vs 自評進度）*/
+  const d2diff = p.cost_pct - p.self_pct;
+  const d2abs = Math.abs(d2diff);
+  const d2cls = d2abs < 3 ? 'd-ok' : d2abs > 8 ? 'd-critical' : 'd-warning';
+  const d2badge = d2abs < 3 ? 'ok' : d2abs > 8 ? 'critical' : 'warning';
+  cards.push({
+    cls: d2cls, badge: d2badge,
+    badgeText: d2abs < 3 ? '✓ 正常' : d2diff > 0 ? `🔴 成本超前 ${d2diff.toFixed(1)}pp` : `⚠ 自評超前 ${(-d2diff).toFixed(1)}pp`,
+    title: 'D2  進度差異（成本 vs 自評）',
+    value: (d2diff>=0?'+':'')+d2diff.toFixed(1)+'pp',
+    valueSub: `成本進度 ${p.cost_pct.toFixed(1)}%  vs  自評進度 ${p.self_pct.toFixed(1)}%`,
+    color: d2abs < 3 ? '#00E676' : d2abs > 8 ? '#FF3D3D' : '#FFB300',
+    sysWarn: null,
+    reasons: d2abs < 3
+      ? ['成本消耗與實體進度吻合，執行健康']
+      : d2diff > 0
+        ? ['前期間接費用或管理成本提前認列','材料超前採購但實體安裝未完成','有計畫外重工或設計變更產生額外成本','人工工時提前投入但產出落後']
+        : ['自評進度可能過於樂觀','工程計價已送出但成本尚未認列','現場進度填報與財務系統存在時間落差'],
+    actions: d2abs < 3
+      ? ['維持現有執行節奏，持續月度追蹤']
+      : d2diff > 0
+        ? ['要求 PM 說明成本超前具體項目','重新評估 EAC，確認完工成本預測','召開緊急成本審查會議']
+        : ['要求 PM 提供進度自評佐證文件','現場稽核實際完工比例'],
+  });
+
+  /* D3: 認列成本差（估算 BCMS vs 會計 ACC577）*/
+  const d3diff = p.cost_acc - cost_bcms_est;
+  const d3pct = Math.abs(d3diff) / Math.max(cost_bcms_est, 1) * 100;
+  const d3cls = d3pct < 5 ? 'd-ok' : d3pct > 12 ? 'd-critical' : 'd-warning';
+  const d3badge = d3pct < 5 ? 'ok' : d3pct > 12 ? 'critical' : 'warning';
+  cards.push({
+    cls: d3cls, badge: d3badge,
+    badgeText: d3pct < 5 ? '✓ 差異正常' : `${d3pct>12?'🔴':'⚠'} 差異 ${d3diff>=0?'+':''}${d3diff.toFixed(1)}M (${d3pct.toFixed(1)}%)`,
+    title: 'D3  認列成本差異（BCMS vs 會計）',
+    value: (d3diff>=0?'+':'')+d3diff.toFixed(1)+' M',
+    valueSub: `BCMS 估算 ${cost_bcms_est.toFixed(1)}M  vs  會計認列 ${p.cost_acc.toFixed(1)}M`,
+    color: d3pct < 5 ? '#00E676' : d3pct > 12 ? '#FF3D3D' : '#FFB300',
+    sysWarn: null,
+    reasons: d3pct < 5
+      ? ['BCMS 成本與會計認列吻合，資料一致性良好']
+      : d3diff > 0
+        ? ['會計已認列但 BCMS 尚未更新（月結時間差）','匯兌損益或調整項目未反映在 BCMS','間接成本分攤方式不同']
+        : ['BCMS 預估成本高於實際會計認列','部分成本在 BCMS 預提但會計未認列'],
+    actions: d3pct < 5
+      ? ['繼續保持月度對帳機制']
+      : [`${d3pct>12?'立即':'本月'}完成 BCMS / ACC577 對帳`,'確認差異的具體科目與金額','建立每月自動對帳機制'],
+  });
+
+  /* D4: EAC 差（BCMS EAC vs 會計 EAC）*/
+  const d4diff = p.eac_bcms - p.eac_acc;
+  const d4pct = Math.abs(d4diff) / Math.max(p.eac_acc, 1) * 100;
+  const d4cls = d4pct < 3 ? 'd-ok' : d4pct > 8 ? 'd-critical' : 'd-warning';
+  const d4badge = d4pct < 3 ? 'ok' : d4pct > 8 ? 'critical' : 'warning';
+  cards.push({
+    cls: d4cls, badge: d4badge,
+    badgeText: d4pct < 3 ? '✓ EAC 一致' : `${d4pct>8?'🔴':'⚠'} 差異 ${d4diff>=0?'+':''}${d4diff.toFixed(1)}M (${d4pct.toFixed(1)}%)`,
+    title: 'D4  EAC 差異（BCMS vs 會計）',
+    value: (d4diff>=0?'+':'')+d4diff.toFixed(1)+' M',
+    valueSub: `BCMS ${p.eac_bcms.toFixed(1)}M  vs  會計 ${p.eac_acc.toFixed(1)}M`,
+    color: d4pct < 3 ? '#00E676' : d4pct > 8 ? '#FF3D3D' : '#FFB300',
+    sysWarn: null,
+    reasons: d4pct < 3
+      ? ['BCMS EAC 與會計 EAC 一致，完工成本預測可信度高']
+      : d4diff > 0
+        ? ['BCMS 已納入最新風險準備金，會計尚未更新','PM 調整 EAC 但會計尚未同步','BCMS 採較保守的完工估算']
+        : ['會計已反映追加合約成本影響，BCMS 落後','兩系統採用不同成本歸屬方式'],
+    actions: d4pct < 3
+      ? ['維持每月 EAC 審查機制']
+      : [`${d4pct>8?'立即召開':'本月安排'} EAC 對帳會議`,'確認以哪個 EAC 版本為決策依據','同步更新兩系統 EAC'],
+  });
+
+  /* 渲染 */
+  document.getElementById('d-diag-grid').innerHTML = cards.map(c=>`
+    <div class="diag-card ${c.cls}">
+      <div class="diag-header">
+        <div class="diag-title">${c.title}</div>
+        <span class="diag-badge ${c.badge}">${c.badgeText}</span>
+      </div>
+      <div class="diag-value" style="color:${c.color}">${c.value}</div>
+      <div class="diag-value-sub">${c.valueSub}</div>
+      ${c.sysWarn?`<div class="diag-sys-warn">⚠ ${c.sysWarn}</div>`:''}
+      <div class="diag-divider"></div>
+      <div class="diag-section-lbl">可能原因</div>
+      ${c.reasons.map(r=>`<div class="diag-item reason">${r}</div>`).join('')}
+      <div class="diag-divider"></div>
+      <div class="diag-section-lbl">建議行動</div>
+      ${c.actions.map(a=>`<div class="diag-item action">${a}</div>`).join('')}
+    </div>`).join('');
+}
+
+/* ── INIT ────────────────────────────────────── */
+// 注入展示用 PM 說明紀錄（只在尚無紀錄時執行）
+(function seedDemoComments(){
+  const key = 'ctci_pm_comments';
+  const demo = {
+    "21 5500D": {
+      "T2_prog_diff": [
+        {
+          text: "【本月說明 2026/05】施工段因業主要求重新確認介面設計，導致 HOOK-UP 工程延後約 3 週開始。目前與業主協商中，預計本月底可取得書面確認，後續趕工計畫已排定，每週增加 2 班人力投入，預計 Q3 結束前可追回落後進度。",
+          ts: "2026/05/31 10:24:18"
+        },
+        {
+          text: "【上月說明 2026/04】4 月份因設備到貨延遲（供應商缺料），現場安裝進度受阻，自評進度較成本進度落後約 12pp。已向採購部門提出緊急催料，預計 5 月中旬設備可全數到位。",
+          ts: "2026/04/30 16:45:02"
+        },
+        {
+          text: "【2026/03 說明】3 月初因連續降雨（高雄地區 18 個雨天），戶外管線施工暫停，進度落後 8pp。已向業主申請工期展延 15 天，待業主書面回覆中。室內作業已提前展開，降低整體衝擊。",
+          ts: "2026/03/31 17:02:45"
+        }
+      ],
+      "T6_late_risk": [
+        {
+          text: "【本月說明 2026/05】目前 E&C 風險準備金預計用於尾期介面整合測試所需的加班費及第三方檢驗費，約 800 萬元。SE&C 部分約 1,200 萬尚待確認是否需啟用，主要視業主最終驗收標準而定。預計完工前 2 個月將提交風險準備金使用計畫供管理層核准。",
+          ts: "2026/05/31 11:08:33"
+        },
+        {
+          text: "【2026/04 說明】上月已動用 E&C 準備金 320 萬元用於電氣設備二次測試費用（因業主規格變更）。目前剩餘 E&C 480 萬，SE&C 1,344 萬，將於完工前提出整體使用計畫。",
+          ts: "2026/04/30 15:33:10"
+        }
+      ]
+    },
+    "22 5000D": {
+      "T3_billing": [
+        {
+          text: "【本月說明 2026/05】本案 Q1 請款里程碑文件已備齊，但因業主（中鼎工程）內部簽核流程調整，審核週期由原定 30 天延長至 45 天。預計 6 月 15 日可完成業主確認，發票將於確認後 5 個工作天內開立。目前與業主聯絡窗口保持每週追蹤。",
+          ts: "2026/05/31 14:22:45"
+        },
+        {
+          text: "【2026/04 說明】第二期請款（1,850 萬）已於 4/12 送件，業主要求補充竣工照片 23 張及材料合格證明，已於 4/18 補件完成。預計 5 月初完成審核收款。",
+          ts: "2026/04/30 10:05:33"
+        },
+        {
+          text: "【2026/03 說明】第一期請款（2,100 萬）延遲原因：業主驗收時發現 3 個 Punch List 項目需先完成，已於 3/25 完成缺失改善，請款文件重新送出，預計 4 月中旬收款。",
+          ts: "2026/03/31 09:48:22"
+        }
+      ],
+      "T1_cost_diff": [
+        {
+          text: "【本月說明 2026/05】BCMS 與 ACC577 成本差異主要來自：(1) 4 月份材料收料金額 387 萬元，BCMS 已認列但 ACC577 因月結時間差尚未更新；(2) 匯兌損益調整項目 124 萬元僅在會計系統反映。兩項合計 511 萬元，預計下月月結後差異將收斂至 5% 以內。",
+          ts: "2026/05/31 09:15:20"
+        },
+        {
+          text: "【2026/04 說明】本月差異 423 萬，主要為間接成本分攤時間差（Q1 結算）。已與財務部確認，預計 5 月月結時一次性更新 BCMS，差異將歸零。",
+          ts: "2026/04/30 08:55:14"
+        }
+      ]
+    }
+  };
+  localStorage.setItem(key, JSON.stringify(demo));
+})();
+
+renderSummary();
+renderCashflowChart();
+renderAIBrief();
+renderPortfolioCharts();
+initGenieChips();
+switchView('tile');
+
+/* ── VIEW SWITCH ─────────────────────────────── */
+
+function switchView(v){
+  currentView = v;
+  document.getElementById('list-wrap').style.display = v==='list' ? 'block' : 'none';
+  document.getElementById('tile-wrap').style.display  = v==='tile'  ? 'block' : 'none';
+  const bl = document.getElementById('btn-list');
+  const bt = document.getElementById('btn-tile');
+  bl.style.background = v==='list' ? 'rgba(0,229,255,.15)' : 'transparent';
+  bl.style.color       = v==='list' ? '#00FFFF' : '#8BAAC8';
+  bl.style.boxShadow   = v==='list' ? '0 0 12px rgba(0,229,255,.35)' : 'none';
+  bt.style.background  = v==='tile' ? 'rgba(0,229,255,.15)' : 'transparent';
+  bt.style.color        = v==='tile' ? '#00FFFF' : '#8BAAC8';
+  bt.style.boxShadow    = v==='tile' ? '0 0 12px rgba(0,229,255,.35)' : 'none';
+  if(v==='tile') renderTiles();
+}
+
+function renderBoth(){
+  renderTable();
+  if(currentView==='tile') renderTiles();
+}
+
+function renderTiles(){
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  let data = PROJECTS.filter(p=>{
+    if(activeFilter!=='all' && p.rag!==activeFilter) return false;
+    if(q && !p.name.toLowerCase().includes(q) && !p.pm.toLowerCase().includes(q)
+       && !p.id.toLowerCase().includes(q) && !p.client.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  data.sort((a,b)=>ragOrder(a.rag)-ragOrder(b.rag)||a.margin_cur-b.margin_cur);
+
+  const mC = p => p.margin_cur<8?'var(--red)':p.margin_cur<11?'var(--amber)':'var(--green)';
+  const alertClass = p => p.rag==='R'?'':'rag'===p.rag?'warn':'ok';
+
+  document.getElementById('proj-tiles').innerHTML = data.map(p=>{
+    const md = (p.margin_cur - p.margin_base).toFixed(1);
+    const photo = PROJ_PHOTOS[p.id];
+    const photoHTML = photo
+      ? `<img class="tile-photo" src="${photo}" alt="${p.name}" loading="lazy" onerror="this.style.display='none'">`
+      : `<div class="tile-photo-placeholder">${p.client.includes('電力')?'⚡':p.client.includes('高鐵')||p.client.includes('捷運')||p.client.includes('機場')?'🚄':p.client.includes('積電')||p.client.includes('巨')?'💡':'🏭'}</div>`;
+    const alertCls = p.rag==='R'?'':'tile-alert '+(p.rag==='A'?'warn':'ok');
+    return `<div class="proj-tile rag-${p.rag}" onclick="showDetail('${p.id}')">
+      ${photoHTML}
+      <div class="tile-body">
+        <div class="tile-header">
+          <span class="tile-id">${p.id}</span>
+          <span class="tile-rag ${p.rag}">${p.rag==='R'?'CRITICAL':p.rag==='A'?'WARNING':'NORMAL'}</span>
+        </div>
+        <div class="tile-name">${p.name}</div>
+        <div class="tile-client">${p.client}</div>
+        <div class="tile-kpis">
+          <div class="tile-kpi">
+            <div class="tile-kpi-label">現行毛利率</div>
+            <div class="tile-kpi-value" style="color:${mC(p)}">${pct(p.margin_cur)}</div>
+            <div class="tile-kpi-delta" style="color:${+md<0?'var(--red)':+md>0?'var(--green)':'var(--amber)'}">${+md>0?'+':''}${md}pp</div>
+          </div>
+          <div class="tile-kpi">
+            <div class="tile-kpi-label">合約金額</div>
+            <div class="tile-kpi-value" style="color:#00FFFF">${p.contract.toFixed(0)}M</div>
+            <div class="tile-kpi-delta" style="color:#8BAAC8">TWD</div>
+          </div>
+        </div>
+        <div class="tile-progress">
+          <div class="tile-prog-row">
+            <span class="tile-prog-label">成本</span>
+            <div class="tile-prog-bg"><div class="tile-prog-fill" style="width:${p.cost_pct}%;background:var(--orange)"></div></div>
+            <span class="tile-prog-val" style="color:var(--orange)">${pct(p.cost_pct)}</span>
+          </div>
+          <div class="tile-prog-row">
+            <span class="tile-prog-label">自評</span>
+            <div class="tile-prog-bg"><div class="tile-prog-fill" style="width:${p.self_pct}%;background:var(--cyan)"></div></div>
+            <span class="tile-prog-val" style="color:var(--cyan)">${pct(p.self_pct)}</span>
+          </div>
+        </div>
+        <div class="tile-alert ${p.rag==='G'?'ok':p.rag==='A'?'warn':''}">${p.alerts[0]}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
